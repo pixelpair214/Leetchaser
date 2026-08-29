@@ -536,19 +536,26 @@ class LeetCodeService {
       const solvedSlugs = Array.from(problemMap.keys());
       const similarMap = new Map<string, any>();
 
-      for (const slug of solvedSlugs.slice(0, 4)) {
+      // First pass: hydrate ALL from local DB
+      for (const slug of solvedSlugs) {
         try {
-          // Check local database cache for fast lookup of ID & details
           const cached = await leetcodeDB.getProblemBySlug(slug);
-          const existing = problemMap.get(slug);
-
           if (cached) {
+            const existing = problemMap.get(slug);
             existing.id = cached.id;
             existing.difficulty = cached.difficulty;
             existing.isPaidOnly = cached.isPaidOnly;
             existing.acRate = cached.acRate;
             existing.status = cached.status;
           }
+        } catch (e) {
+          console.warn(`Failed DB lookup for ${slug}:`, e);
+        }
+      }
+
+      for (const slug of solvedSlugs.slice(0, 4)) {
+        try {
+          const existing = problemMap.get(slug);
 
           const qRes = await fetch(this.DAILY_ENDPOINT, {
             method: 'POST',
@@ -563,7 +570,8 @@ class LeetCodeService {
 
           if (q) {
             if (!existing.id) {
-              existing.id = parseInt(q.questionFrontendId) || 0;
+              // Can be a string like "LCP 01" or "12"
+              existing.id = q.questionFrontendId || 0;
             }
             existing.difficulty = q.difficulty || existing.difficulty || 'Medium';
             existing.isPaidOnly = q.isPaidOnly ?? existing.isPaidOnly ?? false;
@@ -573,7 +581,7 @@ class LeetCodeService {
                 const parsed = JSON.parse(q.similarQuestions);
                 for (const sim of parsed.slice(0, 2)) {
                   if (!problemMap.has(sim.titleSlug) && !similarMap.has(sim.titleSlug)) {
-                    let simId = 0;
+                    let simId: string | number = 0;
                     const cachedSim = await leetcodeDB.getProblemBySlug(sim.titleSlug);
                     if (cachedSim) simId = cachedSim.id;
 

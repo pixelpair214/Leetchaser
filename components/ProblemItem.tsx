@@ -107,7 +107,7 @@ const ProblemItem = forwardRef<HTMLDivElement, ProblemItemProps>(
             {/* Problem ID */}
             <div className="flex-shrink-0">
               <span className="text-xs font-semibold text-[var(--muted-foreground)] w-8">
-                {problem.id}
+                {typeof problem.id === 'number' && problem.id >= 999000 ? '' : problem.id}
               </span>
             </div>
 
