@@ -42,8 +42,8 @@ export default function SearchInput({
             isAtCommand
               ? 'Type @chase to enter chase mode...'
               : isSlashCommand
-              ? 'Type command name...'
-              : 'Search problems or type @chase...'
+              ? 'Type /random, /suggestion, /help...'
+              : 'Search problems, /commands, or @chase...'
           }
           className={`w-full pl-10 pr-16 py-3 text-sm border border-[var(--border)] rounded-xl focus:outline-none focus:ring-1 focus:ring-[var(--ring)] transition-all placeholder:text-[var(--muted-foreground)] ${
             isAtCommand

@@ -1,4 +1,4 @@
-import { ChevronUp, ChevronDown, Heart } from 'lucide-react';
+import { ChevronUp, ChevronDown, Github } from 'lucide-react';
 
 import { Enter } from '@/components/icons/enter';
 import { Shift } from '@/components/icons/shift';
@@ -6,6 +6,14 @@ import { Shift } from '@/components/icons/shift';
 export default function Footer() {
   // Get version from manifest
   const version = browser.runtime.getManifest().version;
+
+  const handleOpenGithub = (e: React.MouseEvent) => {
+    e.preventDefault();
+    browser.tabs.create({
+      url: 'https://github.com/pixelpair214/Leetchaser',
+      active: true,
+    });
+  };
 
   return (
     <div className="px-4 py-2 border-t border-[var(--border)] bg-[var(--muted)] flex-shrink-0">
@@ -45,7 +53,16 @@ export default function Footer() {
 
       {/* Links and Attribution */}
       <div className="flex justify-between items-center text-xs text-[var(--muted-foreground)] pt-2 border-t border-[var(--border)]">
-        <div className="flex items-center gap-3 border-separate">
+        <div className="flex items-center gap-1.5">
+          <a
+            href="https://github.com/pixelpair214/Leetchaser"
+            onClick={handleOpenGithub}
+            className="flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors group cursor-pointer"
+            title="View Leetchaser on GitHub"
+          >
+            <Github className="w-3.5 h-3.5 group-hover:text-[var(--foreground)] transition-colors" />
+            <span className="text-[11px]">made by pixelpair</span>
+          </a>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 opacity-75">

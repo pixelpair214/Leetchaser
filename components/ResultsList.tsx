@@ -37,15 +37,17 @@ export default function ResultsList({
   onToggleGroup,
 }: ResultsListProps) {
   const hasResults = displayItems.length > 0;
-  const isSlashCommand = query.startsWith('/');
+  const isCommand = query.startsWith('/') || query.startsWith('@');
   const shouldShowEmpty =
-    (!hasResults && !isLoading && !isSlashCommand) ||
+    (!hasResults && !isLoading && !isCommand) ||
     (isShowingHistory && !hasResults && !isLoading);
-  const shouldShowSlashSuggestions = isSlashCommand && slashCommandSuggestions.length > 0;
+  const shouldShowSlashSuggestions = isCommand && slashCommandSuggestions.length > 0;
 
   // Check if we're in help mode
   const isHelpMode =
-    query.toLowerCase().startsWith('/help') || query.toLowerCase().startsWith('/commands');
+    query.toLowerCase().startsWith('/help') ||
+    query.toLowerCase().startsWith('/commands') ||
+    query.toLowerCase().startsWith('@help');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -74,7 +76,12 @@ export default function ResultsList({
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto">
       {shouldShowEmpty && (
-        <EmptyState hasQuery={!!query} isLoading={isLoading} isShowingHistory={isShowingHistory} />
+        <EmptyState
+          hasQuery={!!query}
+          isLoading={isLoading}
+          isShowingHistory={isShowingHistory}
+          isShowingSuggestions={isShowingSuggestions}
+        />
       )}
 
       {shouldShowSlashSuggestions && (
@@ -87,7 +94,7 @@ export default function ResultsList({
         />
       )}
 
-      {hasResults && !isSlashCommand && (
+      {hasResults && !isCommand && (
         <div className="space-y-0 relative">
           {(() => {
             const groupedElements = [];
@@ -164,10 +171,10 @@ export default function ResultsList({
         </div>
       )}
 
-      {isSlashCommand && slashCommandSuggestions.length === 0 && !isLoading && (
+      {isCommand && slashCommandSuggestions.length === 0 && !isLoading && (
         <div className="px-4 py-12 text-center">
           <div className="text-sm font-medium text-[var(--foreground)] mb-1">No commands found</div>
-          <div className="text-xs text-[var(--muted-foreground)]">Try typing /potd or /help</div>
+          <div className="text-xs text-[var(--muted-foreground)]">Try typing @chase or /help</div>
         </div>
       )}
     </div>

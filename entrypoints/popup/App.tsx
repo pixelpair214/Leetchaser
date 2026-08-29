@@ -215,10 +215,19 @@ function App() {
           similarToTitle: entry.similarToTitle,
         }));
 
-        setResults(groupSuggestionsByFriend(formattedResults));
+        const grouped = groupSuggestionsByFriend(formattedResults);
+        const allFriendGroups = new Set<string>();
+        grouped.forEach(r => {
+          if (r.groupFriend?.username) {
+            allFriendGroups.add(r.groupFriend.username);
+          }
+        });
+
+        setResults(grouped);
         setIsShowingSuggestions(true);
         setIsShowingHistory(false);
-        setExpandedGroups(new Set());
+        setIsShowingChaseMode(false);
+        setExpandedGroups(allFriendGroups);
         setQuery('');
         setSlashCommandSuggestions([]);
       } else {
@@ -235,15 +244,12 @@ function App() {
 
   // Initialize slash commands
   useEffect(() => {
-    // Removed POTD command as it is now in the dashboard
-
-
-
     // Register chase command
     slashCommandService.registerCommand({
       id: 'chase',
       aliases: ['chase', 'target', 'race'],
       description: 'Enter Chase Mode: 1v1 telemetry & race up to 3 LeetCode members',
+      prefix: '@',
       execute: async () => {
         setIsShowingChaseMode(true);
         setIsShowingHistory(false);
@@ -257,6 +263,7 @@ function App() {
       id: 'random',
       aliases: ['random'],
       description: 'Open a random problem',
+      prefix: '/',
       execute: async () => {
         setIsLoading(true);
         try {
@@ -265,6 +272,7 @@ function App() {
           });
           if (response?.success) {
             setQuery('');
+            setSlashCommandSuggestions([]);
           } else {
             console.error('Failed to open random problem:', response?.error);
           }
@@ -280,7 +288,8 @@ function App() {
     slashCommandService.registerCommand({
       id: 'suggestion',
       aliases: ['suggestion', 'suggestions', 'recommend'],
-      description: 'Show questions recently solved by followed users & similar recommended questions from GraphQL',
+      description: 'Show questions recently solved by followed users & similar recommended questions',
+      prefix: '/',
       execute: async () => {
         await fetchSuggestions();
       },
@@ -291,7 +300,9 @@ function App() {
       id: 'help',
       aliases: ['help', 'commands'],
       description: 'Show all available commands',
+      prefix: '/',
       execute: async () => {
+        setQuery('/help');
         const suggestions = slashCommandService.getSuggestions('/help');
         setSlashCommandSuggestions(suggestions);
       },
@@ -302,6 +313,7 @@ function App() {
       id: 'history',
       aliases: ['history', 'recent'],
       description: 'View your last 10 opened problems',
+      prefix: '/',
       execute: async () => {
         setIsLoading(true);
         try {
@@ -326,11 +338,13 @@ function App() {
               }));
               setResults(historyResults);
               setIsShowingHistory(true);
+              setIsShowingSuggestions(false);
               setIsShowingChaseMode(false);
             } else {
               // Empty history - show empty state
               setResults([]);
               setIsShowingHistory(true);
+              setIsShowingSuggestions(false);
               setIsShowingChaseMode(false);
             }
             setQuery('');
@@ -355,9 +369,11 @@ function App() {
       id: 'theme',
       aliases: ['theme', 'dark', 'light'],
       description: 'Toggle between dark and light mode',
+      prefix: '/',
       execute: async () => {
         handleToggleTheme();
         setQuery('');
+        setSlashCommandSuggestions([]);
       },
     });
 
@@ -366,12 +382,14 @@ function App() {
       id: 'review',
       aliases: ['rate', 'review', 'store'],
       description: 'Rate this extension on the store',
+      prefix: '/',
       execute: async () => {
         try {
           await browser.runtime.sendMessage({
             type: 'OPEN_EXTENSION_STORE',
           });
           setQuery('');
+          setSlashCommandSuggestions([]);
         } catch (error) {
           console.error('Failed to execute RATE command:', error);
         }
@@ -482,7 +500,6 @@ function App() {
 
   // Handle command selection
   const handleSlashCommandSelect = useCallback(async (command: string) => {
-    setQuery(command);
     const cleanCmd = command.startsWith('/') || command.startsWith('@') ? command.slice(1).toLowerCase() : command.toLowerCase();
     
     if (cleanCmd === 'chase' || cleanCmd === 'target' || cleanCmd === 'race') {
@@ -497,6 +514,7 @@ function App() {
     if (slashCommandService.isValidCommand(command)) {
       await slashCommandService.executeCommand(command);
     } else {
+      setQuery(command);
       const suggestions = slashCommandService.getSuggestions(command);
       setSlashCommandSuggestions(suggestions);
     }
@@ -504,7 +522,7 @@ function App() {
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    async (e: React.KeyboardEvent) => {
       const isCommandMode = query.startsWith('/') || query.startsWith('@');
       const maxIndex = isCommandMode ? slashCommandSuggestions.length - 1 : displayItems.length - 1;
 
@@ -522,7 +540,13 @@ function App() {
         case 'Enter':
           e.preventDefault();
           const cleanQuery = query.trim().toLowerCase();
-          if (cleanQuery === '@chase' || cleanQuery === '/chase') {
+          const isChaseTrigger =
+            cleanQuery === '@chase' ||
+            cleanQuery === '/chase' ||
+            cleanQuery === '@target' ||
+            cleanQuery === '@race';
+
+          if (isChaseTrigger) {
             setIsShowingChaseMode(true);
             setIsShowingHistory(false);
             setIsShowingSuggestions(false);
@@ -535,17 +559,24 @@ function App() {
             if (slashCommandSuggestions[selectedIndex]) {
               const suggestion = slashCommandSuggestions[selectedIndex];
 
-              // Special handling for help command - don't execute, just show suggestions
+              if (suggestion.command.id === 'chase') {
+                setIsShowingChaseMode(true);
+                setIsShowingHistory(false);
+                setIsShowingSuggestions(false);
+                setQuery('');
+                setSlashCommandSuggestions([]);
+                return;
+              }
+
               if (suggestion.command.id === 'help') {
                 setQuery('/help');
                 const helpSuggestions = slashCommandService.getSuggestions('/help');
                 setSlashCommandSuggestions(helpSuggestions);
               } else {
-                // Execute other commands
-                suggestion.command.execute();
+                await suggestion.command.execute();
               }
-            } else {
-              slashCommandService.executeCommand(query);
+            } else if (slashCommandService.isValidCommand(query)) {
+              await slashCommandService.executeCommand(query);
             }
           } else if (!isCommandMode && displayItems[selectedIndex]) {
             const item = displayItems[selectedIndex];
@@ -633,13 +664,15 @@ function App() {
         userStats={dashboardData?.userStats || null}
       />
 
-      <SearchInput
-        query={query}
-        isLoading={isLoading}
-        inputRef={inputRef}
-        onQueryChange={handleQueryChange}
-        onKeyDown={handleKeyDown}
-      />
+      {!isShowingChaseMode && (
+        <SearchInput
+          query={query}
+          isLoading={isLoading}
+          inputRef={inputRef}
+          onQueryChange={handleQueryChange}
+          onKeyDown={handleKeyDown}
+        />
+      )}
 
       {isShowingChaseMode ? (
         <ChaseMode

@@ -53,6 +53,17 @@ export default function ChaseMode({ onClose, onOpenProblem }: ChaseModeProps) {
     loadSavedTargets();
   }, []);
 
+  // Global keydown handler to exit on Escape
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [onClose]);
+
   // Fetch chase data whenever targetUsernames change or manual sync
   const fetchChaseStats = useCallback(async (targets: string[]) => {
     setIsLoading(true);
@@ -187,14 +198,12 @@ export default function ChaseMode({ onClose, onOpenProblem }: ChaseModeProps) {
       {/* CHASE HUD TOP BAR */}
       <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--card)] flex-shrink-0 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-[#FF8A00]/20 flex items-center justify-center text-[#FF8A00]">
-            <Target className="w-3.5 h-3.5 animate-pulse" />
-          </div>
+          <Target className="w-4 h-4 text-[#FF8A00] animate-pulse" />
           <div>
             <div className="flex items-center gap-1.5 font-bold text-xs">
               <span className="text-[#FF8A00]">CHASE</span>
               <span className="text-[var(--foreground)]">ARENA</span>
-              <span className="text-[9px] font-mono px-1.5 py-0.2 bg-[#FF8A00]/10 text-[#FF8A00] rounded-full border border-[#FF8A00]/30 font-semibold">
+              <span className="text-[9px] font-mono px-1.5 py-0.5 bg-[#FF8A00]/10 text-[#FF8A00] rounded-full border border-[#FF8A00]/30 font-semibold">
                 LIVE 1v1
               </span>
             </div>

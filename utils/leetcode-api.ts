@@ -516,7 +516,24 @@ class LeetCodeService {
       }
     }
 
-    // Fallback if no followed users found or user not logged in
+    // Also include chased targets if saved
+    try {
+      const stored = (await browser.storage.local.get('chase_targets')) as any;
+      const targets: string[] = stored?.['chase_targets'] || [];
+      targets.forEach(t => {
+        if (!followedUsers.some(u => u.userSlug.toLowerCase() === t.toLowerCase())) {
+          followedUsers.push({
+            userSlug: t,
+            userAvatar: this.DEFAULT_AVATAR,
+            realName: t,
+          });
+        }
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    // Fallback if no followed users found
     if (followedUsers.length === 0) {
       followedUsers = [
         { userSlug: 'lee215', userAvatar: this.DEFAULT_AVATAR, realName: 'Lee' },
@@ -618,7 +635,7 @@ class LeetCodeService {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 query: acQuery,
-                variables: { username: friend.userSlug, limit: 5 },
+                variables: { username: friend.userSlug, limit: 8 },
               }),
             });
             const acData = await acRes.json();
@@ -637,7 +654,7 @@ class LeetCodeService {
               if (!existing.solvedByFriends.some((f: any) => f.username === friend.userSlug)) {
                 existing.solvedByFriends.push({
                   username: friend.userSlug,
-                  avatarUrl: friend.userAvatar || 'https://assets.leetcode.com/users/default_avatar.jpg',
+                  avatarUrl: friend.userAvatar || this.DEFAULT_AVATAR,
                   timestamp: sub.timestamp,
                 });
               }
@@ -648,7 +665,7 @@ class LeetCodeService {
         })
       );
 
-      // 4. Fetch details & similar questions via GraphQL
+      // Fetch details & similar questions via GraphQL
       const questionQuery = `
         query questionData($titleSlug: String!) {
           question(titleSlug: $titleSlug) {
@@ -665,7 +682,7 @@ class LeetCodeService {
       const solvedSlugs = Array.from(problemMap.keys());
       const similarMap = new Map<string, any>();
 
-      // First pass: hydrate ALL from local DB
+      // First pass: hydrate from local DB
       for (const slug of solvedSlugs) {
         try {
           const cached = await leetcodeDB.getProblemBySlug(slug);
@@ -683,22 +700,20 @@ class LeetCodeService {
       }
 
       // Pick representative slugs to fetch similar questions for
-      // to ensure we get a mix across different friends
-      // We only want to seed recommendations using problems the user hasn't solved yet
       const slugsToFetchSimilar = new Set<string>();
       for (const friend of followedUsers.slice(0, 5)) {
         let addedForFriend = 0;
         for (const slug of solvedSlugs) {
           const existing = problemMap.get(slug);
-          if (existing.status !== 'ac' && existing.solvedByFriends.some((f: any) => f.username === friend.userSlug)) {
+          if (existing.solvedByFriends.some((f: any) => f.username === friend.userSlug)) {
             slugsToFetchSimilar.add(slug);
             addedForFriend++;
-            if (addedForFriend >= 2) break; // max 2 similar-fetches per friend
+            if (addedForFriend >= 2) break;
           }
         }
       }
       
-      const slugsArrayToFetch = Array.from(slugsToFetchSimilar).slice(0, 5);
+      const slugsArrayToFetch = Array.from(slugsToFetchSimilar).slice(0, 6);
 
       await Promise.all(
         slugsArrayToFetch.map(async (slug) => {
@@ -718,7 +733,6 @@ class LeetCodeService {
 
             if (q) {
               if (!existing.id) {
-                // Can be a string like "LCP 01" or "12"
                 existing.id = q.questionFrontendId || 0;
               }
               existing.difficulty = q.difficulty || existing.difficulty || 'Medium';
@@ -729,7 +743,6 @@ class LeetCodeService {
                   const parsed = JSON.parse(q.similarQuestions);
                   for (const sim of parsed.slice(0, 2)) {
                     if (!problemMap.has(sim.titleSlug) && !similarMap.has(sim.titleSlug)) {
-                      // Add a placeholder to prevent concurrent redundant fetches for the same similar question
                       similarMap.set(sim.titleSlug, { isPlaceholder: true });
 
                       let simId: string | number = 0;
@@ -770,7 +783,7 @@ class LeetCodeService {
           id: item.id || ++fallbackId,
           difficulty: item.difficulty || 'Medium',
         }))
-        .filter(item => item.status !== 'ac' && !item.isPlaceholder);
+        .filter(item => !item.isPlaceholder);
 
       return finalResults;
     } catch (error) {
