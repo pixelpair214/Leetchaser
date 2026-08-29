@@ -7,8 +7,90 @@ import SearchInput from '@/components/SearchInput';
 import ResultsList from '@/components/ResultsList';
 import Footer from '@/components/Footer';
 
-interface SearchResult extends LeetCodeProblem {
-  matchType?: 'id' | 'title' | 'slug';
+export interface FriendUser {
+  username: string;
+  avatarUrl?: string;
+}
+
+export interface SearchResult extends LeetCodeProblem {
+  matchType?: 'id' | 'title' | 'slug' | 'following' | 'similar';
+  solvedByFriends?: FriendUser[];
+  similarToTitle?: string;
+  /** Set on /suggestion results only. Items sharing the same groupFriend.username
+   * are rendered consecutively under one friend header by ResultsList. */
+  groupFriend?: FriendUser;
+}
+
+// Sentinel used for similar-problem items that aren't tied to any followed
+// friend's solved problem (e.g. general recommendations).
+const RECOMMENDED_GROUP: FriendUser = { username: '__recommended__' };
+
+/**
+ * Reorders flat /suggestion results into friend blocks:
+ * [friend A header] A's solved problems -> similar picks stemming from those
+ * [friend B header] B's solved problems -> similar picks stemming from those
+ * [Recommended header] any similar picks not tied to a followed problem
+ *
+ * The array order IS the render/selection order, so keyboard nav and
+ * selectedIndex in App.tsx keep working unchanged - ResultsList just draws
+ * a header whenever `groupFriend.username` changes between consecutive items.
+ */
+function groupSuggestionsByFriend(items: SearchResult[]): SearchResult[] {
+  const following = items.filter(i => i.matchType === 'following');
+  const similar = items.filter(i => i.matchType === 'similar');
+  const others = items.filter(i => i.matchType !== 'following' && i.matchType !== 'similar');
+
+  // Map each followed problem's title -> the similar items that reference it
+  const similarByTitle = new Map<string, SearchResult[]>();
+  similar.forEach(item => {
+    if (!item.similarToTitle) return;
+    const bucket = similarByTitle.get(item.similarToTitle) || [];
+    bucket.push(item);
+    similarByTitle.set(item.similarToTitle, bucket);
+  });
+  const usedSimilar = new Set<SearchResult>();
+
+  // Group followed problems by their primary (first) friend, preserving
+  // first-seen order of friends
+  const friendOrder: string[] = [];
+  const friendBlocks = new Map<string, { friend: FriendUser; solved: SearchResult[] }>();
+  following.forEach(item => {
+    const friend = item.solvedByFriends?.[0];
+    if (!friend) return;
+    if (!friendBlocks.has(friend.username)) {
+      friendBlocks.set(friend.username, { friend, solved: [] });
+      friendOrder.push(friend.username);
+    }
+    friendBlocks.get(friend.username)!.solved.push(item);
+  });
+
+  const grouped: SearchResult[] = [];
+
+  friendOrder.forEach(username => {
+    const { friend, solved } = friendBlocks.get(username)!;
+
+    solved.forEach(item => {
+      grouped.push({ ...item, groupFriend: friend });
+    });
+
+    solved.forEach(solvedItem => {
+      const matches = similarByTitle.get(solvedItem.title) || [];
+      matches.forEach(match => {
+        if (usedSimilar.has(match)) return;
+        usedSimilar.add(match);
+        grouped.push({ ...match, groupFriend: friend });
+      });
+    });
+  });
+
+  const leftoverSimilar = similar.filter(i => !usedSimilar.has(i));
+  leftoverSimilar.forEach(item => {
+    grouped.push({ ...item, groupFriend: RECOMMENDED_GROUP });
+  });
+
+  grouped.push(...others);
+
+  return grouped;
 }
 
 function App() {
@@ -25,6 +107,7 @@ function App() {
     []
   );
   const [isShowingHistory, setIsShowingHistory] = useState(false);
+  const [isShowingSuggestions, setIsShowingSuggestions] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -33,8 +116,8 @@ function App() {
   useEffect(() => {
     const loadTheme = async () => {
       try {
-        const result = await browser.storage.local.get('theme');
-        const savedTheme = result.theme || 'light';
+        const result = (await browser.storage.local.get('theme')) as any;
+        const savedTheme = result?.theme || 'light';
         const isDark = savedTheme === 'dark';
         setIsDarkMode(isDark);
         document.documentElement.setAttribute('data-theme', savedTheme);
@@ -57,6 +140,47 @@ function App() {
       console.error('Failed to save theme:', error);
     }
   }, [isDarkMode]);
+
+  // Fetch suggestions: friend-solved questions + similar questions
+  const fetchSuggestions = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: 'GET_FRIEND_SUGGESTIONS',
+      });
+
+      if (response?.success) {
+        const suggestionsData = response.data || [];
+
+        const formattedResults: SearchResult[] = suggestionsData.map((entry: any) => ({
+          id: entry.id,
+          title: entry.title,
+          slug: entry.slug,
+          difficulty: entry.difficulty,
+          isPaidOnly: entry.isPaidOnly ?? false,
+          acRate: entry.acRate ?? 0,
+          status: entry.status ?? null,
+          matchType: entry.isSimilar ? 'similar' : 'following',
+          solvedByFriends: entry.solvedByFriends || [],
+          similarToTitle: entry.similarToTitle,
+        }));
+
+        setResults(groupSuggestionsByFriend(formattedResults));
+        setIsShowingSuggestions(true);
+        setIsShowingHistory(false);
+        setQuery('');
+        setSlashCommandSuggestions([]);
+      } else {
+        console.error('Failed to get friend suggestions:', response?.error);
+        setResults([]);
+      }
+    } catch (error) {
+      console.error('Failed to execute SUGGESTION command:', error);
+      setResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Initialize slash commands
   useEffect(() => {
@@ -107,6 +231,16 @@ function App() {
         } finally {
           setIsLoading(false);
         }
+      },
+    });
+
+    // Register /suggestion command
+    slashCommandService.registerCommand({
+      id: 'suggestion',
+      aliases: ['suggestion', 'suggestions', 'recommend', 'friends', 'following'],
+      description: 'Show questions solved by followed users & similar recommended questions from GraphQL',
+      execute: async () => {
+        await fetchSuggestions();
       },
     });
 
@@ -199,7 +333,7 @@ function App() {
         }
       },
     });
-  }, [handleToggleTheme]);
+  }, [handleToggleTheme, fetchSuggestions]);
 
   // Focus input on mount
   useEffect(() => {
@@ -234,6 +368,7 @@ function App() {
     setQuery(newQuery);
     setSelectedIndex(0);
     setIsShowingHistory(false); // Clear history mode when user types
+    setIsShowingSuggestions(false); // Clear suggestions mode when user types
 
     if (newQuery.startsWith('/')) {
       // Handle slash commands
@@ -262,7 +397,7 @@ function App() {
       });
 
       if (response?.success) {
-        const enhancedResults: SearchResult[] = response.data.map((problem: LeetCodeProblem) => {
+        const enhancedResults: SearchResult[] = response.data.map((problem: SearchResult) => {
           const lowerQuery = searchQuery.toLowerCase();
           let matchType: 'id' | 'title' | 'slug' = 'title';
 
@@ -291,20 +426,24 @@ function App() {
 
   // Debounced search effect
   useEffect(() => {
-    if (!query.startsWith('/') && !isShowingHistory) {
+    if (!query.startsWith('/') && !isShowingHistory && !isShowingSuggestions) {
       const timer = setTimeout(() => {
         performSearch(query);
       }, 150);
 
       return () => clearTimeout(timer);
     }
-  }, [query, performSearch, isShowingHistory]);
+  }, [query, performSearch, isShowingHistory, isShowingSuggestions]);
 
   // Handle slash command selection
-  const handleSlashCommandSelect = useCallback((command: string) => {
+  const handleSlashCommandSelect = useCallback(async (command: string) => {
     setQuery(command);
-    const suggestions = slashCommandService.getSuggestions(command);
-    setSlashCommandSuggestions(suggestions);
+    if (slashCommandService.isValidCommand(command)) {
+      await slashCommandService.executeCommand(command);
+    } else {
+      const suggestions = slashCommandService.getSuggestions(command);
+      setSlashCommandSuggestions(suggestions);
+    }
   }, []);
 
   // Handle keyboard navigation
@@ -326,17 +465,21 @@ function App() {
 
         case 'Enter':
           e.preventDefault();
-          if (isSlashMode && slashCommandSuggestions[selectedIndex]) {
-            const suggestion = slashCommandSuggestions[selectedIndex];
+          if (isSlashMode) {
+            if (slashCommandSuggestions[selectedIndex]) {
+              const suggestion = slashCommandSuggestions[selectedIndex];
 
-            // Special handling for help command - don't execute, just show suggestions
-            if (suggestion.command.id === 'help') {
-              setQuery('/help');
-              const helpSuggestions = slashCommandService.getSuggestions('/help');
-              setSlashCommandSuggestions(helpSuggestions);
+              // Special handling for help command - don't execute, just show suggestions
+              if (suggestion.command.id === 'help') {
+                setQuery('/help');
+                const helpSuggestions = slashCommandService.getSuggestions('/help');
+                setSlashCommandSuggestions(helpSuggestions);
+              } else {
+                // Execute other commands
+                suggestion.command.execute();
+              }
             } else {
-              // Execute other commands
-              suggestion.command.execute();
+              slashCommandService.executeCommand(query);
             }
           } else if (!isSlashMode && results[selectedIndex]) {
             // Open selected problem - Enter opens in new tab, Shift+Enter in same tab
@@ -351,6 +494,7 @@ function App() {
           setResults([]);
           setSlashCommandSuggestions([]);
           setIsShowingHistory(false);
+          setIsShowingSuggestions(false);
           break;
       }
     },
@@ -435,6 +579,7 @@ function App() {
         slashCommandSuggestions={slashCommandSuggestions}
         onSelectSlashCommand={handleSlashCommandSelect}
         isShowingHistory={isShowingHistory}
+        isShowingSuggestions={isShowingSuggestions}
       />
 
       <Footer />

@@ -185,6 +185,16 @@ export default defineBackground(() => {
             }
             break;
 
+          case 'GET_FRIEND_SUGGESTIONS':
+            try {
+              const suggestions = await leetcodeService.getFriendSuggestions();
+              response = { success: true, data: suggestions };
+            } catch (error) {
+              console.error('Failed to get friend suggestions:', error);
+              response = { success: false, error: 'Failed to get friend suggestions' };
+            }
+            break;
+
           case 'OPEN_EXTENSION_STORE':
             try {
               const browserType = import.meta.env.BROWSER;

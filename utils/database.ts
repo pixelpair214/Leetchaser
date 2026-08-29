@@ -95,7 +95,7 @@ class LeetCodeDatabase {
     version: string;
   }): Promise<void> {
     await this.init();
-    await this.db!.put('metadata', { key: 'sync', ...metadata });
+    await (this.db! as any).put('metadata', { key: 'sync', ...metadata });
   }
 
   async getMetadata(): Promise<
