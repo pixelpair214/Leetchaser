@@ -235,6 +235,27 @@ export default defineBackground(() => {
             }
             break;
 
+          case 'GET_CHASE_DATA':
+            try {
+              const targets = message.targets || [];
+              const chaseData = await leetcodeService.fetchChaseData(targets);
+              response = { success: true, data: chaseData };
+            } catch (error) {
+              console.error('Failed to get chase data:', error);
+              response = { success: false, error: 'Failed to get chase data' };
+            }
+            break;
+
+          case 'VALIDATE_LEETCODE_USERNAME':
+            try {
+              const isValid = await leetcodeService.validateUsername(message.username);
+              response = { success: true, isValid };
+            } catch (error) {
+              console.error('Failed to validate username:', error);
+              response = { success: false, error: 'Failed to validate username' };
+            }
+            break;
+
           default:
             console.warn('Unknown message type:', message.type);
             response = { success: false, error: 'Unknown message type' };

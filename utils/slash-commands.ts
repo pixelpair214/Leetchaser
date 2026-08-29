@@ -8,6 +8,7 @@ export interface SlashCommand {
 export interface SlashCommandSuggestion {
   command: SlashCommand;
   matchedAlias: string;
+  prefix?: string;
 }
 
 class SlashCommandService {
@@ -26,17 +27,19 @@ class SlashCommandService {
   }
 
   getSuggestions(input: string): SlashCommandSuggestion[] {
-    if (!input.startsWith('/')) return [];
+    if (!input.startsWith('/') && !input.startsWith('@')) return [];
 
+    const prefix = input.charAt(0);
     const query = input.slice(1).toLowerCase();
 
-    // Special case: if it's exactly "/help" or "/commands", show all commands
+    // Special case: if it's exactly "/help" or "/commands" or "@help", show all commands
     if (query === 'help' || query === 'commands' || query === '') {
       return this.getCommands()
         .sort((a, b) => a.id.localeCompare(b.id))
         .map(cmd => ({
           command: cmd,
           matchedAlias: cmd.aliases[0],
+          prefix,
         }));
     }
 
@@ -45,7 +48,7 @@ class SlashCommandService {
     for (const command of this.commands.values()) {
       for (const alias of command.aliases) {
         if (alias.toLowerCase().startsWith(query)) {
-          suggestions.push({ command, matchedAlias: alias });
+          suggestions.push({ command, matchedAlias: alias, prefix });
           break; // Only add each command once
         }
       }
@@ -64,7 +67,7 @@ class SlashCommandService {
   }
 
   isValidCommand(input: string): boolean {
-    if (!input.startsWith('/')) return false;
+    if (!input.startsWith('/') && !input.startsWith('@')) return false;
     const query = input.slice(1).toLowerCase();
 
     for (const command of this.commands.values()) {
@@ -76,7 +79,7 @@ class SlashCommandService {
   }
 
   async executeCommand(input: string): Promise<boolean> {
-    if (!input.startsWith('/')) return false;
+    if (!input.startsWith('/') && !input.startsWith('@')) return false;
     const query = input.slice(1).toLowerCase();
 
     for (const command of this.commands.values()) {

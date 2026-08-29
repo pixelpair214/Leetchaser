@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import { UserStats } from '@/utils/leetcode-api';
+import React from 'react';
+import { UserStats, DailyProblemData } from '@/utils/leetcode-api';
+import { Target, Trophy, Flame, ChevronRight } from 'lucide-react';
 
 export interface DashboardData {
-  dailyProblem: { slug: string; title: string; difficulty: string } | null;
+  dailyProblem: DailyProblemData | null;
   friendSuggestions: any[];
   userStats: UserStats | null;
 }
@@ -11,9 +12,10 @@ interface DashboardProps {
   data: DashboardData | null;
   isLoading: boolean;
   onOpenProblem: (slug: string, problemData?: any) => void;
+  onEnterChaseMode?: () => void;
 }
 
-export default function Dashboard({ data, isLoading, onOpenProblem }: DashboardProps) {
+export default function Dashboard({ data, isLoading, onOpenProblem, onEnterChaseMode }: DashboardProps) {
   if (isLoading) {
     return (
       <div className="flex-1 flex flex-col p-4 space-y-6 animate-pulse">
@@ -117,6 +119,32 @@ export default function Dashboard({ data, isLoading, onOpenProblem }: DashboardP
         </section>
       )}
 
+      {/* CHASE MODE BANNER */}
+      {onEnterChaseMode && (
+        <section>
+          <div
+            onClick={onEnterChaseMode}
+            className="bg-gradient-to-r from-[#FF8A00]/15 via-[var(--card)] to-[var(--card)] border border-[#FF8A00]/40 rounded-xl p-3.5 cursor-pointer hover:border-[#FF8A00] transition-all group shadow-sm flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-[#FF8A00]/20 flex items-center justify-center text-[#FF8A00] group-hover:scale-105 transition-transform">
+                <Target className="w-4 h-4 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-xs">
+                  <span className="text-[#FF8A00]">CHASE MODE</span>
+                  <span className="text-[9px] font-mono px-1 py-0.2 bg-[#FF8A00]/20 text-[#FF8A00] rounded font-bold">@chase</span>
+                </div>
+                <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                  Live 1v1 telemetry & race up to 3 LeetCode members
+                </div>
+              </div>
+            </div>
+
+            <ChevronRight className="w-4 h-4 text-[#FF8A00] group-hover:translate-x-0.5 transition-transform" />
+          </div>
+        </section>
+      )}
 
     </div>
   );

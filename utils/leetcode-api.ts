@@ -39,6 +39,65 @@ export interface UserStats {
   streak: number;
 }
 
+export interface DailyProblemData {
+  id?: number | string;
+  slug: string;
+  title: string;
+  difficulty: string;
+}
+
+export interface ChasedUserData {
+  username: string;
+  realName: string | null;
+  avatarUrl: string;
+  ranking: number;
+  reputation: number;
+  country: string | null;
+  school: string | null;
+  company: string | null;
+  solvedStats: {
+    totalSolved: number;
+    easySolved: number;
+    mediumSolved: number;
+    hardSolved: number;
+    totalEasy: number;
+    totalMedium: number;
+    totalHard: number;
+    totalProblems: number;
+    acceptanceRate: number;
+    totalSubmissions: number;
+  };
+  contestStats: {
+    rating: number | null;
+    globalRanking: number | null;
+    topPercentage: number | null;
+    attendedContests: number;
+    badgeName: string | null;
+  } | null;
+  activityStats: {
+    solvedToday: number;
+    solvedThisWeek: number;
+    streak: number;
+    totalCalendarSubmissions: number;
+  };
+  recentSubmissions: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    timestamp: string;
+  }>;
+  badges: Array<{
+    id: string;
+    displayName: string;
+    icon: string;
+  }>;
+}
+
+export interface ChaseModeData {
+  currentUser: ChasedUserData | null;
+  targets: ChasedUserData[];
+}
+
 class LeetCodeService {
   private readonly API_ENDPOINT = 'https://leetcode.com/api/problems/all/';
   private readonly DAILY_ENDPOINT = 'https://leetcode.com/graphql';
@@ -51,7 +110,7 @@ class LeetCodeService {
   private friendSolvedMapCacheTime = 0;
   private readonly FRIEND_SOLVED_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-  async getDailyProblem(): Promise<{ slug: string; title: string; difficulty: string } | null> {
+  async getDailyProblem(): Promise<DailyProblemData | null> {
     try {
       const query = `
         query questionOfToday {
@@ -97,6 +156,7 @@ class LeetCodeService {
 
       if (dailyQuestion) {
         return {
+          id: dailyQuestion.frontendQuestionId || '',
           slug: dailyQuestion.titleSlug,
           title: dailyQuestion.title,
           difficulty: dailyQuestion.difficulty,
@@ -766,6 +826,285 @@ class LeetCodeService {
     } catch (e) {
       console.error('Failed to get friends activity:', e);
       return [];
+    }
+  }
+
+  async fetchFullUserProfile(username: string): Promise<ChasedUserData | null> {
+    try {
+      const query = `
+        query userChaseProfile($username: String!) {
+          matchedUser(username: $username) {
+            username
+            githubUrl
+            profile {
+              ranking
+              userAvatar
+              realName
+              aboutMe
+              school
+              countryName
+              company
+              jobTitle
+              reputation
+            }
+            submitStatsGlobal {
+              acSubmissionNum {
+                difficulty
+                count
+                submissions
+              }
+              totalSubmissionNum {
+                difficulty
+                count
+                submissions
+              }
+            }
+            badges {
+              id
+              displayName
+              icon
+              creationDate
+            }
+            submissionCalendar
+          }
+          userContestRanking(username: $username) {
+            attendedContestsCount
+            rating
+            globalRanking
+            totalParticipants
+            topPercentage
+            badge {
+              name
+            }
+          }
+          allQuestionsCount {
+            difficulty
+            count
+          }
+          recentAcSubmissionList(username: $username, limit: 15) {
+            id
+            title
+            titleSlug
+            timestamp
+          }
+        }
+      `;
+
+      const response = await fetch(this.DAILY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables: { username } }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const resData = await response.json();
+      const user = resData.data?.matchedUser;
+      if (!user) return null;
+
+      const profile = user.profile || {};
+      const contest = resData.data?.userContestRanking;
+      const allQuestions = resData.data?.allQuestionsCount || [];
+      const recentAc = resData.data?.recentAcSubmissionList || [];
+
+      // Total questions in LeetCode
+      let totalAll = 0;
+      let totalEasy = 0;
+      let totalMedium = 0;
+      let totalHard = 0;
+      allQuestions.forEach((q: any) => {
+        if (q.difficulty === 'All') totalAll = q.count;
+        if (q.difficulty === 'Easy') totalEasy = q.count;
+        if (q.difficulty === 'Medium') totalMedium = q.count;
+        if (q.difficulty === 'Hard') totalHard = q.count;
+      });
+
+      // Solved breakdown
+      const acNums = user.submitStatsGlobal?.acSubmissionNum || [];
+      const totalNums = user.submitStatsGlobal?.totalSubmissionNum || [];
+
+      let totalSolved = 0;
+      let easySolved = 0;
+      let mediumSolved = 0;
+      let hardSolved = 0;
+      let totalAcSubmissions = 0;
+      acNums.forEach((item: any) => {
+        if (item.difficulty === 'All') {
+          totalSolved = item.count;
+          totalAcSubmissions = item.submissions;
+        }
+        if (item.difficulty === 'Easy') easySolved = item.count;
+        if (item.difficulty === 'Medium') mediumSolved = item.count;
+        if (item.difficulty === 'Hard') hardSolved = item.count;
+      });
+
+      let totalSubmissionsCount = 0;
+      totalNums.forEach((item: any) => {
+        if (item.difficulty === 'All') totalSubmissionsCount = item.submissions;
+      });
+
+      const acceptanceRate =
+        totalSubmissionsCount > 0
+          ? Number(((totalAcSubmissions / totalSubmissionsCount) * 100).toFixed(1))
+          : 0;
+
+      // Activity / Streak calculation
+      let solvedToday = 0;
+      let solvedThisWeek = 0;
+      let streak = 0;
+      let totalCalendarSubmissions = 0;
+
+      if (user.submissionCalendar) {
+        try {
+          const calendar: Record<string, number> = JSON.parse(user.submissionCalendar);
+          const now = new Date();
+          const todayStartUTC =
+            new Date(
+              Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+            ).getTime() / 1000;
+
+          solvedToday = calendar[todayStartUTC.toString()] || 0;
+
+          for (let i = 0; i < 7; i++) {
+            const day = todayStartUTC - i * 86400;
+            solvedThisWeek += calendar[day.toString()] || 0;
+          }
+
+          let currentDay = todayStartUTC;
+          if (!calendar[currentDay.toString()]) {
+            currentDay -= 86400;
+          }
+          while (calendar[currentDay.toString()]) {
+            streak++;
+            currentDay -= 86400;
+          }
+
+          Object.values(calendar).forEach(count => {
+            totalCalendarSubmissions += count;
+          });
+        } catch (e) {
+          console.warn('Failed to parse calendar:', e);
+        }
+      }
+
+      // Avatar URL handling
+      let avatarUrl = profile.userAvatar || this.DEFAULT_AVATAR;
+      if (avatarUrl.startsWith('/')) {
+        avatarUrl = `https://leetcode.com${avatarUrl}`;
+      }
+
+      return {
+        username: user.username || username,
+        realName: profile.realName || null,
+        avatarUrl,
+        ranking: profile.ranking || 0,
+        reputation: profile.reputation || 0,
+        country: profile.countryName || null,
+        school: profile.school || null,
+        company: profile.company || null,
+        solvedStats: {
+          totalSolved,
+          easySolved,
+          mediumSolved,
+          hardSolved,
+          totalEasy: totalEasy || 850,
+          totalMedium: totalMedium || 1750,
+          totalHard: totalHard || 750,
+          totalProblems: totalAll || 3350,
+          acceptanceRate,
+          totalSubmissions: totalSubmissionsCount,
+        },
+        contestStats: contest
+          ? {
+              rating: contest.rating ? Math.round(contest.rating) : null,
+              globalRanking: contest.globalRanking || null,
+              topPercentage: contest.topPercentage
+                ? Number(contest.topPercentage.toFixed(2))
+                : null,
+              attendedContests: contest.attendedContestsCount || 0,
+              badgeName: contest.badge?.name || null,
+            }
+          : null,
+        activityStats: {
+          solvedToday,
+          solvedThisWeek,
+          streak,
+          totalCalendarSubmissions,
+        },
+        recentSubmissions: recentAc.map((sub: any) => ({
+          id: sub.id,
+          title: sub.title,
+          slug: sub.titleSlug,
+          timestamp: sub.timestamp,
+        })),
+        badges: (user.badges || []).map((b: any) => ({
+          id: b.id,
+          displayName: b.displayName,
+          icon: b.icon?.startsWith('http') ? b.icon : `https://leetcode.com${b.icon || ''}`,
+        })),
+      };
+    } catch (error) {
+      console.error(`Failed to fetch user profile for ${username}:`, error);
+      return null;
+    }
+  }
+
+  async fetchChaseData(targetUsernames: string[]): Promise<ChaseModeData> {
+    const { username: currentUsername } = await this.getUserStatus();
+
+    // Fetch current user and all target users in parallel
+    const allUsernamesToFetch = Array.from(
+      new Set([
+        ...(currentUsername ? [currentUsername] : []),
+        ...targetUsernames.filter(Boolean),
+      ])
+    );
+
+    const userResults = await Promise.all(
+      allUsernamesToFetch.map(u => this.fetchFullUserProfile(u))
+    );
+
+    const userMap = new Map<string, ChasedUserData>();
+    userResults.forEach(res => {
+      if (res) {
+        userMap.set(res.username.toLowerCase(), res);
+      }
+    });
+
+    const currentUser = currentUsername
+      ? userMap.get(currentUsername.toLowerCase()) || null
+      : null;
+    const targets = targetUsernames
+      .map(u => userMap.get(u.toLowerCase()))
+      .filter((u): u is ChasedUserData => !!u);
+
+    return {
+      currentUser,
+      targets,
+    };
+  }
+
+  async validateUsername(username: string): Promise<boolean> {
+    if (!username || !username.trim()) return false;
+    try {
+      const query = `
+        query checkUser($username: String!) {
+          matchedUser(username: $username) {
+            username
+          }
+        }
+      `;
+      const res = await fetch(this.DAILY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables: { username: username.trim() } }),
+      });
+      const data = await res.json();
+      return !!data.data?.matchedUser?.username;
+    } catch (e) {
+      return false;
     }
   }
 }

@@ -7,6 +7,7 @@ import SearchInput from '@/components/SearchInput';
 import ResultsList from '@/components/ResultsList';
 import Footer from '@/components/Footer';
 import Dashboard, { DashboardData } from '@/components/Dashboard';
+import ChaseMode from '@/components/ChaseMode';
 
 export interface FriendUser {
   username: string;
@@ -92,6 +93,7 @@ function App() {
   );
   const [isShowingHistory, setIsShowingHistory] = useState(false);
   const [isShowingSuggestions, setIsShowingSuggestions] = useState(false);
+  const [isShowingChaseMode, setIsShowingChaseMode] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
@@ -237,6 +239,20 @@ function App() {
 
 
 
+    // Register chase command
+    slashCommandService.registerCommand({
+      id: 'chase',
+      aliases: ['chase', 'target', 'race'],
+      description: 'Enter Chase Mode: 1v1 telemetry & race up to 3 LeetCode members',
+      execute: async () => {
+        setIsShowingChaseMode(true);
+        setIsShowingHistory(false);
+        setIsShowingSuggestions(false);
+        setQuery('');
+        setSlashCommandSuggestions([]);
+      },
+    });
+
     slashCommandService.registerCommand({
       id: 'random',
       aliases: ['random'],
@@ -274,7 +290,7 @@ function App() {
     slashCommandService.registerCommand({
       id: 'help',
       aliases: ['help', 'commands'],
-      description: 'Show all available slash commands',
+      description: 'Show all available commands',
       execute: async () => {
         const suggestions = slashCommandService.getSuggestions('/help');
         setSlashCommandSuggestions(suggestions);
@@ -310,10 +326,12 @@ function App() {
               }));
               setResults(historyResults);
               setIsShowingHistory(true);
+              setIsShowingChaseMode(false);
             } else {
               // Empty history - show empty state
               setResults([]);
               setIsShowingHistory(true);
+              setIsShowingChaseMode(false);
             }
             setQuery('');
             setSlashCommandSuggestions([]);
@@ -397,20 +415,20 @@ function App() {
     setIsShowingSuggestions(false); // Clear suggestions mode when user types
     setExpandedGroups(new Set());
 
-    if (newQuery.startsWith('/')) {
-      // Handle slash commands
+    if (newQuery.startsWith('/') || newQuery.startsWith('@')) {
+      // Handle slash/at commands
       const suggestions = slashCommandService.getSuggestions(newQuery);
       setSlashCommandSuggestions(suggestions);
       setResults([]);
     } else {
-      // Clear slash command suggestions for regular search
+      // Clear command suggestions for regular search
       setSlashCommandSuggestions([]);
     }
   }, []);
 
   // Search function with debouncing
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim() || searchQuery.startsWith('/')) {
+    if (!searchQuery.trim() || searchQuery.startsWith('/') || searchQuery.startsWith('@')) {
       setResults([]);
       return;
     }
@@ -453,18 +471,29 @@ function App() {
 
   // Debounced search effect
   useEffect(() => {
-    if (!query.startsWith('/') && !isShowingHistory && !isShowingSuggestions) {
+    if (!query.startsWith('/') && !query.startsWith('@') && !isShowingHistory && !isShowingSuggestions && !isShowingChaseMode) {
       const timer = setTimeout(() => {
         performSearch(query);
       }, 150);
 
       return () => clearTimeout(timer);
     }
-  }, [query, performSearch, isShowingHistory, isShowingSuggestions]);
+  }, [query, performSearch, isShowingHistory, isShowingSuggestions, isShowingChaseMode]);
 
-  // Handle slash command selection
+  // Handle command selection
   const handleSlashCommandSelect = useCallback(async (command: string) => {
     setQuery(command);
+    const cleanCmd = command.startsWith('/') || command.startsWith('@') ? command.slice(1).toLowerCase() : command.toLowerCase();
+    
+    if (cleanCmd === 'chase' || cleanCmd === 'target' || cleanCmd === 'race') {
+      setIsShowingChaseMode(true);
+      setIsShowingHistory(false);
+      setIsShowingSuggestions(false);
+      setQuery('');
+      setSlashCommandSuggestions([]);
+      return;
+    }
+
     if (slashCommandService.isValidCommand(command)) {
       await slashCommandService.executeCommand(command);
     } else {
@@ -476,8 +505,8 @@ function App() {
   // Handle keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      const isSlashMode = query.startsWith('/');
-      const maxIndex = isSlashMode ? slashCommandSuggestions.length - 1 : displayItems.length - 1;
+      const isCommandMode = query.startsWith('/') || query.startsWith('@');
+      const maxIndex = isCommandMode ? slashCommandSuggestions.length - 1 : displayItems.length - 1;
 
       switch (e.key) {
         case 'ArrowDown':
@@ -492,7 +521,17 @@ function App() {
 
         case 'Enter':
           e.preventDefault();
-          if (isSlashMode) {
+          const cleanQuery = query.trim().toLowerCase();
+          if (cleanQuery === '@chase' || cleanQuery === '/chase') {
+            setIsShowingChaseMode(true);
+            setIsShowingHistory(false);
+            setIsShowingSuggestions(false);
+            setQuery('');
+            setSlashCommandSuggestions([]);
+            return;
+          }
+
+          if (isCommandMode) {
             if (slashCommandSuggestions[selectedIndex]) {
               const suggestion = slashCommandSuggestions[selectedIndex];
 
@@ -508,7 +547,7 @@ function App() {
             } else {
               slashCommandService.executeCommand(query);
             }
-          } else if (!isSlashMode && displayItems[selectedIndex]) {
+          } else if (!isCommandMode && displayItems[selectedIndex]) {
             const item = displayItems[selectedIndex];
             if (item.type === 'problem') {
               const openInNewTab = !e.shiftKey;
@@ -526,10 +565,11 @@ function App() {
           setSlashCommandSuggestions([]);
           setIsShowingHistory(false);
           setIsShowingSuggestions(false);
+          setIsShowingChaseMode(false);
           break;
       }
     },
-    [results, selectedIndex, query, slashCommandSuggestions]
+    [results, selectedIndex, query, slashCommandSuggestions, displayItems, toggleGroup]
   );
 
   // Open problem in new tab or same tab
@@ -601,11 +641,17 @@ function App() {
         onKeyDown={handleKeyDown}
       />
 
-      {(!query && !isShowingHistory && !isShowingSuggestions) ? (
+      {isShowingChaseMode ? (
+        <ChaseMode
+          onClose={() => setIsShowingChaseMode(false)}
+          onOpenProblem={(slug, data) => openProblem({ slug, ...data } as any, true)}
+        />
+      ) : (!query && !isShowingHistory && !isShowingSuggestions) ? (
         <Dashboard
           data={dashboardData}
           isLoading={isDashboardLoading}
           onOpenProblem={(slug, data) => openProblem({ slug, ...data } as any, true)}
+          onEnterChaseMode={() => setIsShowingChaseMode(true)}
         />
       ) : (
         <ResultsList
