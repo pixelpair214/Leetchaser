@@ -88,60 +88,79 @@ export default function ResultsList({
       )}
 
       {hasResults && !isSlashCommand && (
-        <div className="space-y-0">
-          {displayItems.map((item, index) => {
-            if (item.type === 'header') {
-              return (
-                <div
-                  key={item.id}
-                  ref={(el: HTMLDivElement | null) => { itemRefs.current[index] = el; }}
-                  onClick={() => onToggleGroup?.(item.groupUsername)}
-                  className={`sticky top-0 z-10 flex items-center justify-between px-4 py-1.5 bg-[var(--muted)] border-b border-[var(--border)] cursor-pointer hover:bg-[var(--accent)] transition-colors ${index === selectedIndex ? 'ring-2 ring-inset ring-[var(--primary)]' : ''}`}
-                >
-                  <div className="flex items-center gap-2">
-                    {item.groupUsername === RECOMMENDED_GROUP_USERNAME ? (
-                      <span className="text-xs font-semibold text-[var(--muted-foreground)]">
-                        Recommended for you
-                      </span>
-                    ) : (
-                      <>
-                        <img
-                          src={
-                            item.groupFriend?.avatarUrl ||
-                            'https://assets.leetcode.com/users/default_avatar.jpg'
-                          }
-                          alt={item.groupFriend?.username}
-                          className="w-4 h-4 rounded-full object-cover"
-                        />
-                        <span className="text-xs font-semibold text-[var(--foreground)]">
-                          {item.groupFriend?.username}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {item.isCollapsed ? (
-                    <ChevronRight className="w-4 h-4 text-[var(--muted-foreground)]" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
-                  )}
-                </div>
-              );
-            }
+        <div className="space-y-0 relative">
+          {(() => {
+            const groupedElements = [];
+            let currentGroup: { item: DisplayItem; index: number }[] = [];
+            
+            displayItems.forEach((item, index) => {
+              if (item.type === 'header') {
+                if (currentGroup.length > 0) groupedElements.push(currentGroup);
+                currentGroup = [{ item, index }];
+              } else {
+                currentGroup.push({ item, index });
+              }
+            });
+            if (currentGroup.length > 0) groupedElements.push(currentGroup);
 
-            return (
-              <div key={item.id}>
-                <ProblemItem
-                  ref={(el: HTMLDivElement | null) => {
-                    itemRefs.current[index] = el;
-                  }}
-                  problem={item.problem}
-                  index={index}
-                  selectedIndex={selectedIndex}
-                  onOpen={onOpenProblem}
-                />
+            return groupedElements.map((group, groupIdx) => (
+              <div key={groupIdx} className="relative">
+                {group.map(({ item, index }) => {
+                  if (item.type === 'header') {
+                    return (
+                      <div
+                        key={item.id}
+                        ref={(el: HTMLDivElement | null) => { itemRefs.current[index] = el; }}
+                        onClick={() => onToggleGroup?.(item.groupUsername)}
+                        className={`sticky top-0 z-10 flex items-center justify-between px-4 py-1.5 bg-[var(--muted)] border-b border-[var(--border)] cursor-pointer hover:bg-[var(--accent)] transition-colors ${index === selectedIndex ? 'ring-2 ring-inset ring-[var(--primary)]' : ''}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {item.groupUsername === RECOMMENDED_GROUP_USERNAME ? (
+                            <span className="text-xs font-semibold text-[var(--muted-foreground)]">
+                              Recommended for you
+                            </span>
+                          ) : (
+                            <>
+                              <img
+                                src={
+                                  item.groupFriend?.avatarUrl ||
+                                  'https://assets.leetcode.com/users/default_avatar.jpg'
+                                }
+                                alt={item.groupFriend?.username}
+                                className="w-4 h-4 rounded-full object-cover"
+                              />
+                              <span className="text-xs font-semibold text-[var(--foreground)]">
+                                {item.groupFriend?.username}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {item.isCollapsed ? (
+                          <ChevronRight className="w-4 h-4 text-[var(--muted-foreground)]" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={item.id}>
+                      <ProblemItem
+                        ref={(el: HTMLDivElement | null) => {
+                          itemRefs.current[index] = el;
+                        }}
+                        problem={item.problem}
+                        index={index}
+                        selectedIndex={selectedIndex}
+                        onOpen={onOpenProblem}
+                      />
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            ));
+          })()}
         </div>
       )}
 

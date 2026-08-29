@@ -262,8 +262,8 @@ function App() {
     // Register /suggestion command
     slashCommandService.registerCommand({
       id: 'suggestion',
-      aliases: ['suggestion', 'suggestions', 'recommend', 'friends', 'following'],
-      description: 'Show questions solved by followed users & similar recommended questions from GraphQL',
+      aliases: ['suggestion', 'suggestions', 'recommend'],
+      description: 'Show questions recently solved by followed users & similar recommended questions from GraphQL',
       execute: async () => {
         await fetchSuggestions();
       },

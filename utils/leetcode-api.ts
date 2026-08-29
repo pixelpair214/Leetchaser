@@ -484,40 +484,42 @@ class LeetCodeService {
         }
       `;
 
-      for (const friend of followedUsers.slice(0, 5)) {
-        try {
-          const acRes = await fetch(this.DAILY_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: acQuery,
-              variables: { username: friend.userSlug, limit: 5 },
-            }),
-          });
-          const acData = await acRes.json();
-          const submissions = acData.data?.recentAcSubmissionList || [];
+      await Promise.all(
+        followedUsers.slice(0, 5).map(async (friend) => {
+          try {
+            const acRes = await fetch(this.DAILY_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: acQuery,
+                variables: { username: friend.userSlug, limit: 5 },
+              }),
+            });
+            const acData = await acRes.json();
+            const submissions = acData.data?.recentAcSubmissionList || [];
 
-          for (const sub of submissions) {
-            if (!problemMap.has(sub.titleSlug)) {
-              problemMap.set(sub.titleSlug, {
-                title: sub.title,
-                slug: sub.titleSlug,
-                solvedByFriends: [],
-                isSimilar: false,
-              });
+            for (const sub of submissions) {
+              if (!problemMap.has(sub.titleSlug)) {
+                problemMap.set(sub.titleSlug, {
+                  title: sub.title,
+                  slug: sub.titleSlug,
+                  solvedByFriends: [],
+                  isSimilar: false,
+                });
+              }
+              const existing = problemMap.get(sub.titleSlug);
+              if (!existing.solvedByFriends.some((f: any) => f.username === friend.userSlug)) {
+                existing.solvedByFriends.push({
+                  username: friend.userSlug,
+                  avatarUrl: friend.userAvatar || 'https://assets.leetcode.com/users/default_avatar.jpg',
+                });
+              }
             }
-            const existing = problemMap.get(sub.titleSlug);
-            if (!existing.solvedByFriends.some((f: any) => f.username === friend.userSlug)) {
-              existing.solvedByFriends.push({
-                username: friend.userSlug,
-                avatarUrl: friend.userAvatar || 'https://assets.leetcode.com/users/default_avatar.jpg',
-              });
-            }
+          } catch (e) {
+            console.warn(`Failed to fetch AC submissions for ${friend.userSlug}:`, e);
           }
-        } catch (e) {
-          console.warn(`Failed to fetch AC submissions for ${friend.userSlug}:`, e);
-        }
-      }
+        })
+      );
 
       // 4. Fetch details & similar questions via GraphQL
       const questionQuery = `
@@ -571,63 +573,68 @@ class LeetCodeService {
       
       const slugsArrayToFetch = Array.from(slugsToFetchSimilar).slice(0, 5);
 
-      for (const slug of slugsArrayToFetch) {
-        try {
-          const existing = problemMap.get(slug);
+      await Promise.all(
+        slugsArrayToFetch.map(async (slug) => {
+          try {
+            const existing = problemMap.get(slug);
 
-          const qRes = await fetch(this.DAILY_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: questionQuery,
-              variables: { titleSlug: slug },
-            }),
-          });
-          const qData = await qRes.json();
-          const q = qData.data?.question;
+            const qRes = await fetch(this.DAILY_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: questionQuery,
+                variables: { titleSlug: slug },
+              }),
+            });
+            const qData = await qRes.json();
+            const q = qData.data?.question;
 
-          if (q) {
-            if (!existing.id) {
-              // Can be a string like "LCP 01" or "12"
-              existing.id = q.questionFrontendId || 0;
-            }
-            existing.difficulty = q.difficulty || existing.difficulty || 'Medium';
-            existing.isPaidOnly = q.isPaidOnly ?? existing.isPaidOnly ?? false;
+            if (q) {
+              if (!existing.id) {
+                // Can be a string like "LCP 01" or "12"
+                existing.id = q.questionFrontendId || 0;
+              }
+              existing.difficulty = q.difficulty || existing.difficulty || 'Medium';
+              existing.isPaidOnly = q.isPaidOnly ?? existing.isPaidOnly ?? false;
 
-            if (q.similarQuestions) {
-              try {
-                const parsed = JSON.parse(q.similarQuestions);
-                for (const sim of parsed.slice(0, 2)) {
-                  if (!problemMap.has(sim.titleSlug) && !similarMap.has(sim.titleSlug)) {
-                    let simId: string | number = 0;
-                    let simStatus: string | null = null;
-                    const cachedSim = await leetcodeDB.getProblemBySlug(sim.titleSlug);
-                    if (cachedSim) {
-                      simId = cachedSim.id;
-                      simStatus = cachedSim.status;
+              if (q.similarQuestions) {
+                try {
+                  const parsed = JSON.parse(q.similarQuestions);
+                  for (const sim of parsed.slice(0, 2)) {
+                    if (!problemMap.has(sim.titleSlug) && !similarMap.has(sim.titleSlug)) {
+                      // Add a placeholder to prevent concurrent redundant fetches for the same similar question
+                      similarMap.set(sim.titleSlug, { isPlaceholder: true });
+
+                      let simId: string | number = 0;
+                      let simStatus: string | null = null;
+                      const cachedSim = await leetcodeDB.getProblemBySlug(sim.titleSlug);
+                      if (cachedSim) {
+                        simId = cachedSim.id;
+                        simStatus = cachedSim.status ?? null;
+                      }
+
+                      similarMap.set(sim.titleSlug, {
+                        id: simId,
+                        title: sim.title,
+                        slug: sim.titleSlug,
+                        difficulty: sim.difficulty || 'Medium',
+                        status: simStatus,
+                        isPaidOnly: false,
+                        isSimilar: true,
+                        similarToTitle: q.title,
+                      });
                     }
-
-                    similarMap.set(sim.titleSlug, {
-                      id: simId,
-                      title: sim.title,
-                      slug: sim.titleSlug,
-                      difficulty: sim.difficulty || 'Medium',
-                      status: simStatus,
-                      isPaidOnly: false,
-                      isSimilar: true,
-                      similarToTitle: q.title,
-                    });
                   }
+                } catch (err) {
+                  console.warn('Failed to parse similarQuestions JSON:', err);
                 }
-              } catch (err) {
-                console.warn('Failed to parse similarQuestions JSON:', err);
               }
             }
+          } catch (e) {
+            console.warn(`Failed to fetch question details for ${slug}:`, e);
           }
-        } catch (e) {
-          console.warn(`Failed to fetch question details for ${slug}:`, e);
-        }
-      }
+        })
+      );
 
       let fallbackId = 999000;
       const finalResults = [...Array.from(problemMap.values()), ...Array.from(similarMap.values())]
@@ -636,7 +643,7 @@ class LeetCodeService {
           id: item.id || ++fallbackId,
           difficulty: item.difficulty || 'Medium',
         }))
-        .filter(item => item.status !== 'ac');
+        .filter(item => item.status !== 'ac' && !item.isPlaceholder);
 
       return finalResults;
     } catch (error) {
