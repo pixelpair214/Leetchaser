@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { LeetCodeProblem } from '@/utils/database';
-import ProblemItem from './ProblemItem';
+import ProblemItem, { ExtendedProblem } from './ProblemItem';
 import EmptyState from './EmptyState';
 import SlashCommandSuggestions from './SlashCommandSuggestions';
 import { SlashCommandSuggestion } from '@/utils/slash-commands';
 
-interface SearchResult extends LeetCodeProblem {
-  matchType?: 'id' | 'title' | 'slug';
-}
+type SearchResult = ExtendedProblem;
+
+const RECOMMENDED_GROUP_USERNAME = '__recommended__';
 
 interface ResultsListProps {
   results: SearchResult[];
@@ -18,6 +18,7 @@ interface ResultsListProps {
   slashCommandSuggestions?: SlashCommandSuggestion[];
   onSelectSlashCommand?: (command: string) => void;
   isShowingHistory?: boolean;
+  isShowingSuggestions?: boolean;
 }
 
 export default function ResultsList({
@@ -29,6 +30,7 @@ export default function ResultsList({
   slashCommandSuggestions = [],
   onSelectSlashCommand,
   isShowingHistory = false,
+  isShowingSuggestions = false,
 }: ResultsListProps) {
   const hasResults = results.length > 0;
   const isSlashCommand = query.startsWith('/');
@@ -83,18 +85,49 @@ export default function ResultsList({
 
       {hasResults && !isSlashCommand && (
         <div className="space-y-0">
-          {results.map((problem, index) => (
-            <ProblemItem
-              key={problem.id}
-              ref={(el: HTMLDivElement | null) => {
-                itemRefs.current[index] = el;
-              }}
-              problem={problem}
-              index={index}
-              selectedIndex={selectedIndex}
-              onOpen={onOpenProblem}
-            />
-          ))}
+          {results.map((problem, index) => {
+            const prevGroupUsername = results[index - 1]?.groupFriend?.username;
+            const groupUsername = problem.groupFriend?.username;
+            const isNewGroup =
+              isShowingSuggestions && !!groupUsername && groupUsername !== prevGroupUsername;
+
+            return (
+              <div key={problem.id}>
+                {isNewGroup && (
+                  <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-1.5 bg-[var(--muted)] border-b border-[var(--border)]">
+                    {groupUsername === RECOMMENDED_GROUP_USERNAME ? (
+                      <span className="text-xs font-semibold text-[var(--muted-foreground)]">
+                        Recommended for you
+                      </span>
+                    ) : (
+                      <>
+                        <img
+                          src={
+                            problem.groupFriend?.avatarUrl ||
+                            'https://assets.leetcode.com/users/default_avatar.jpg'
+                          }
+                          alt={problem.groupFriend?.username}
+                          className="w-4 h-4 rounded-full object-cover"
+                        />
+                        <span className="text-xs font-semibold text-[var(--foreground)]">
+                          {problem.groupFriend?.username}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+                <ProblemItem
+                  ref={(el: HTMLDivElement | null) => {
+                    itemRefs.current[index] = el;
+                  }}
+                  problem={problem}
+                  index={index}
+                  selectedIndex={selectedIndex}
+                  onOpen={onOpenProblem}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
 
