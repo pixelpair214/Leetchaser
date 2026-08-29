@@ -25,6 +25,10 @@ export interface SearchResult extends LeetCodeProblem {
 // friend's solved problem (e.g. general recommendations).
 const RECOMMENDED_GROUP: FriendUser = { username: '__recommended__' };
 
+export type DisplayItem = 
+  | { type: 'header'; id: string; groupUsername: string; groupFriend?: FriendUser; isCollapsed: boolean }
+  | { type: 'problem'; id: string; problem: SearchResult };
+
 /**
  * Reorders flat /suggestion results into friend blocks:
  * [friend A header] A's solved problems -> similar picks stemming from those
@@ -39,16 +43,6 @@ function groupSuggestionsByFriend(items: SearchResult[]): SearchResult[] {
   const following = items.filter(i => i.matchType === 'following');
   const similar = items.filter(i => i.matchType === 'similar');
   const others = items.filter(i => i.matchType !== 'following' && i.matchType !== 'similar');
-
-  // Map each followed problem's title -> the similar items that reference it
-  const similarByTitle = new Map<string, SearchResult[]>();
-  similar.forEach(item => {
-    if (!item.similarToTitle) return;
-    const bucket = similarByTitle.get(item.similarToTitle) || [];
-    bucket.push(item);
-    similarByTitle.set(item.similarToTitle, bucket);
-  });
-  const usedSimilar = new Set<SearchResult>();
 
   // Group followed problems by their primary (first) friend, preserving
   // first-seen order of friends
@@ -68,23 +62,12 @@ function groupSuggestionsByFriend(items: SearchResult[]): SearchResult[] {
 
   friendOrder.forEach(username => {
     const { friend, solved } = friendBlocks.get(username)!;
-
     solved.forEach(item => {
       grouped.push({ ...item, groupFriend: friend });
     });
-
-    solved.forEach(solvedItem => {
-      const matches = similarByTitle.get(solvedItem.title) || [];
-      matches.forEach(match => {
-        if (usedSimilar.has(match)) return;
-        usedSimilar.add(match);
-        grouped.push({ ...match, groupFriend: friend });
-      });
-    });
   });
 
-  const leftoverSimilar = similar.filter(i => !usedSimilar.has(i));
-  leftoverSimilar.forEach(item => {
+  similar.forEach(item => {
     grouped.push({ ...item, groupFriend: RECOMMENDED_GROUP });
   });
 
@@ -109,8 +92,49 @@ function App() {
   const [isShowingHistory, setIsShowingHistory] = useState(false);
   const [isShowingSuggestions, setIsShowingSuggestions] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const displayItems = React.useMemo(() => {
+    if (!isShowingSuggestions || results.length === 0) {
+      return results.map(p => ({ type: 'problem' as const, id: `prob-${p.id}`, problem: p }));
+    }
+    const items: DisplayItem[] = [];
+    let currentGroup = '';
+    
+    results.forEach(p => {
+      const groupUsername = p.groupFriend?.username;
+      if (groupUsername && groupUsername !== currentGroup) {
+        currentGroup = groupUsername;
+        items.push({
+          type: 'header',
+          id: `header-${groupUsername}`,
+          groupUsername,
+          groupFriend: p.groupFriend,
+          isCollapsed: !expandedGroups.has(groupUsername)
+        });
+      }
+      
+      if (!groupUsername || expandedGroups.has(groupUsername)) {
+        items.push({
+          type: 'problem',
+          id: `prob-${p.id}-${p.slug}`,
+          problem: p
+        });
+      }
+    });
+    return items;
+  }, [results, isShowingSuggestions, expandedGroups]);
+
+  const toggleGroup = useCallback((username: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(username)) next.delete(username);
+      else next.add(username);
+      return next;
+    });
+  }, []);
 
   // Initialize theme from storage
   useEffect(() => {
@@ -168,6 +192,7 @@ function App() {
         setResults(groupSuggestionsByFriend(formattedResults));
         setIsShowingSuggestions(true);
         setIsShowingHistory(false);
+        setExpandedGroups(new Set());
         setQuery('');
         setSlashCommandSuggestions([]);
       } else {
@@ -369,6 +394,7 @@ function App() {
     setSelectedIndex(0);
     setIsShowingHistory(false); // Clear history mode when user types
     setIsShowingSuggestions(false); // Clear suggestions mode when user types
+    setExpandedGroups(new Set());
 
     if (newQuery.startsWith('/')) {
       // Handle slash commands
@@ -450,7 +476,7 @@ function App() {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       const isSlashMode = query.startsWith('/');
-      const maxIndex = isSlashMode ? slashCommandSuggestions.length - 1 : results.length - 1;
+      const maxIndex = isSlashMode ? slashCommandSuggestions.length - 1 : displayItems.length - 1;
 
       switch (e.key) {
         case 'ArrowDown':
@@ -481,10 +507,14 @@ function App() {
             } else {
               slashCommandService.executeCommand(query);
             }
-          } else if (!isSlashMode && results[selectedIndex]) {
-            // Open selected problem - Enter opens in new tab, Shift+Enter in same tab
-            const openInNewTab = !e.shiftKey;
-            openProblem(results[selectedIndex], openInNewTab);
+          } else if (!isSlashMode && displayItems[selectedIndex]) {
+            const item = displayItems[selectedIndex];
+            if (item.type === 'problem') {
+              const openInNewTab = !e.shiftKey;
+              openProblem(item.problem, openInNewTab);
+            } else if (item.type === 'header') {
+              toggleGroup(item.groupUsername);
+            }
           }
           break;
 
@@ -571,7 +601,7 @@ function App() {
       />
 
       <ResultsList
-        results={results}
+        displayItems={displayItems}
         query={query}
         isLoading={isLoading}
         selectedIndex={selectedIndex}
@@ -580,6 +610,7 @@ function App() {
         onSelectSlashCommand={handleSlashCommandSelect}
         isShowingHistory={isShowingHistory}
         isShowingSuggestions={isShowingSuggestions}
+        onToggleGroup={toggleGroup}
       />
 
       <Footer />

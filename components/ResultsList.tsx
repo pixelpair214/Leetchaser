@@ -1,16 +1,18 @@
 import { useEffect, useRef } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { LeetCodeProblem } from '@/utils/database';
 import ProblemItem, { ExtendedProblem } from './ProblemItem';
 import EmptyState from './EmptyState';
 import SlashCommandSuggestions from './SlashCommandSuggestions';
 import { SlashCommandSuggestion } from '@/utils/slash-commands';
+import { DisplayItem } from '../entrypoints/popup/App';
 
 type SearchResult = ExtendedProblem;
 
 const RECOMMENDED_GROUP_USERNAME = '__recommended__';
 
 interface ResultsListProps {
-  results: SearchResult[];
+  displayItems: DisplayItem[];
   query: string;
   isLoading: boolean;
   selectedIndex: number;
@@ -19,10 +21,11 @@ interface ResultsListProps {
   onSelectSlashCommand?: (command: string) => void;
   isShowingHistory?: boolean;
   isShowingSuggestions?: boolean;
+  onToggleGroup?: (username: string) => void;
 }
 
 export default function ResultsList({
-  results,
+  displayItems,
   query,
   isLoading,
   selectedIndex,
@@ -31,8 +34,9 @@ export default function ResultsList({
   onSelectSlashCommand,
   isShowingHistory = false,
   isShowingSuggestions = false,
+  onToggleGroup,
 }: ResultsListProps) {
-  const hasResults = results.length > 0;
+  const hasResults = displayItems.length > 0;
   const isSlashCommand = query.startsWith('/');
   const shouldShowEmpty =
     (!hasResults && !isLoading && !isSlashCommand) ||
@@ -63,9 +67,9 @@ export default function ResultsList({
 
   // Reset refs when results change
   useEffect(() => {
-    const itemCount = shouldShowSlashSuggestions ? slashCommandSuggestions.length : results.length;
+    const itemCount = shouldShowSlashSuggestions ? slashCommandSuggestions.length : displayItems.length;
     itemRefs.current = itemRefs.current.slice(0, itemCount);
-  }, [results.length, slashCommandSuggestions.length, shouldShowSlashSuggestions]);
+  }, [displayItems.length, slashCommandSuggestions.length, shouldShowSlashSuggestions]);
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto">
@@ -85,17 +89,17 @@ export default function ResultsList({
 
       {hasResults && !isSlashCommand && (
         <div className="space-y-0">
-          {results.map((problem, index) => {
-            const prevGroupUsername = results[index - 1]?.groupFriend?.username;
-            const groupUsername = problem.groupFriend?.username;
-            const isNewGroup =
-              isShowingSuggestions && !!groupUsername && groupUsername !== prevGroupUsername;
-
-            return (
-              <div key={problem.id}>
-                {isNewGroup && (
-                  <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-1.5 bg-[var(--muted)] border-b border-[var(--border)]">
-                    {groupUsername === RECOMMENDED_GROUP_USERNAME ? (
+          {displayItems.map((item, index) => {
+            if (item.type === 'header') {
+              return (
+                <div
+                  key={item.id}
+                  ref={(el: HTMLDivElement | null) => { itemRefs.current[index] = el; }}
+                  onClick={() => onToggleGroup?.(item.groupUsername)}
+                  className={`sticky top-0 z-10 flex items-center justify-between px-4 py-1.5 bg-[var(--muted)] border-b border-[var(--border)] cursor-pointer hover:bg-[var(--accent)] transition-colors ${index === selectedIndex ? 'ring-2 ring-inset ring-[var(--primary)]' : ''}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {item.groupUsername === RECOMMENDED_GROUP_USERNAME ? (
                       <span className="text-xs font-semibold text-[var(--muted-foreground)]">
                         Recommended for you
                       </span>
@@ -103,24 +107,34 @@ export default function ResultsList({
                       <>
                         <img
                           src={
-                            problem.groupFriend?.avatarUrl ||
+                            item.groupFriend?.avatarUrl ||
                             'https://assets.leetcode.com/users/default_avatar.jpg'
                           }
-                          alt={problem.groupFriend?.username}
+                          alt={item.groupFriend?.username}
                           className="w-4 h-4 rounded-full object-cover"
                         />
                         <span className="text-xs font-semibold text-[var(--foreground)]">
-                          {problem.groupFriend?.username}
+                          {item.groupFriend?.username}
                         </span>
                       </>
                     )}
                   </div>
-                )}
+                  {item.isCollapsed ? (
+                    <ChevronRight className="w-4 h-4 text-[var(--muted-foreground)]" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div key={item.id}>
                 <ProblemItem
                   ref={(el: HTMLDivElement | null) => {
                     itemRefs.current[index] = el;
                   }}
-                  problem={problem}
+                  problem={item.problem}
                   index={index}
                   selectedIndex={selectedIndex}
                   onOpen={onOpenProblem}

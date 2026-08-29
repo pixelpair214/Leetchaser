@@ -553,7 +553,25 @@ class LeetCodeService {
         }
       }
 
-      for (const slug of solvedSlugs.slice(0, 4)) {
+      // Pick representative slugs to fetch similar questions for
+      // to ensure we get a mix across different friends
+      // We only want to seed recommendations using problems the user hasn't solved yet
+      const slugsToFetchSimilar = new Set<string>();
+      for (const friend of followedUsers.slice(0, 5)) {
+        let addedForFriend = 0;
+        for (const slug of solvedSlugs) {
+          const existing = problemMap.get(slug);
+          if (existing.status !== 'ac' && existing.solvedByFriends.some((f: any) => f.username === friend.userSlug)) {
+            slugsToFetchSimilar.add(slug);
+            addedForFriend++;
+            if (addedForFriend >= 2) break; // max 2 similar-fetches per friend
+          }
+        }
+      }
+      
+      const slugsArrayToFetch = Array.from(slugsToFetchSimilar).slice(0, 5);
+
+      for (const slug of slugsArrayToFetch) {
         try {
           const existing = problemMap.get(slug);
 
@@ -582,14 +600,19 @@ class LeetCodeService {
                 for (const sim of parsed.slice(0, 2)) {
                   if (!problemMap.has(sim.titleSlug) && !similarMap.has(sim.titleSlug)) {
                     let simId: string | number = 0;
+                    let simStatus: string | null = null;
                     const cachedSim = await leetcodeDB.getProblemBySlug(sim.titleSlug);
-                    if (cachedSim) simId = cachedSim.id;
+                    if (cachedSim) {
+                      simId = cachedSim.id;
+                      simStatus = cachedSim.status;
+                    }
 
                     similarMap.set(sim.titleSlug, {
                       id: simId,
                       title: sim.title,
                       slug: sim.titleSlug,
                       difficulty: sim.difficulty || 'Medium',
+                      status: simStatus,
                       isPaidOnly: false,
                       isSimilar: true,
                       similarToTitle: q.title,
@@ -607,13 +630,13 @@ class LeetCodeService {
       }
 
       let fallbackId = 999000;
-      const finalResults = [...Array.from(problemMap.values()), ...Array.from(similarMap.values())].map(
-        item => ({
+      const finalResults = [...Array.from(problemMap.values()), ...Array.from(similarMap.values())]
+        .map(item => ({
           ...item,
           id: item.id || ++fallbackId,
           difficulty: item.difficulty || 'Medium',
-        })
-      );
+        }))
+        .filter(item => item.status !== 'ac');
 
       return finalResults;
     } catch (error) {
