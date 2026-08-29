@@ -34,18 +34,22 @@ export default function SearchInput({
           value={query}
           onChange={e => onQueryChange(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={isSlashCommand ? 'Type command name...' : 'Search by number or title ...'}
-          className={`w-full pl-10 pr-10 py-2 text-sm border-0 rounded-[var(--radius-md)] focus:outline-none focus:ring-1 focus:ring-[var(--ring)] transition-all placeholder:text-[var(--muted-foreground)] ${
+          placeholder={isSlashCommand ? 'Type command name...' : 'Search problems...'}
+          className={`w-full pl-10 pr-12 py-3 text-sm border border-[var(--border)] rounded-xl focus:outline-none focus:ring-1 focus:ring-[var(--ring)] transition-all placeholder:text-[var(--muted-foreground)] ${
             isSlashCommand
-              ? 'bg-[var(--chart-4)]/10 text-[var(--chart-4)] border border-[var(--chart-4)]/30'
-              : 'bg-[var(--muted)] focus:bg-[var(--background)]'
+              ? 'bg-[var(--chart-4)]/10 text-[var(--chart-4)] border-[var(--chart-4)]/30'
+              : 'bg-[var(--card)] text-[var(--foreground)] focus:bg-[var(--background)]'
           }`}
         />
-        {isLoading && (
+        {isLoading ? (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
             <RotateCw className="w-4 h-4 text-[var(--muted-foreground)] animate-spin" />
           </div>
-        )}
+        ) : !isSlashCommand ? (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded bg-[var(--muted)] border border-[var(--border)] text-[10px] text-[var(--muted-foreground)] font-mono">
+            /
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import SearchInput from '@/components/SearchInput';
 import ResultsList from '@/components/ResultsList';
 import Footer from '@/components/Footer';
+import Dashboard, { DashboardData } from '@/components/Dashboard';
 
 export interface FriendUser {
   username: string;
@@ -25,7 +26,7 @@ export interface SearchResult extends LeetCodeProblem {
 // friend's solved problem (e.g. general recommendations).
 const RECOMMENDED_GROUP: FriendUser = { username: '__recommended__' };
 
-export type DisplayItem = 
+export type DisplayItem =
   | { type: 'header'; id: string; groupUsername: string; groupFriend?: FriendUser; isCollapsed: boolean }
   | { type: 'problem'; id: string; problem: SearchResult };
 
@@ -94,6 +95,9 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   const displayItems = React.useMemo(() => {
@@ -102,7 +106,7 @@ function App() {
     }
     const items: DisplayItem[] = [];
     let currentGroup = '';
-    
+
     results.forEach(p => {
       const groupUsername = p.groupFriend?.username;
       if (groupUsername && groupUsername !== currentGroup) {
@@ -115,7 +119,7 @@ function App() {
           isCollapsed: !expandedGroups.has(groupUsername)
         });
       }
-      
+
       if (!groupUsername || expandedGroups.has(groupUsername)) {
         items.push({
           type: 'problem',
@@ -150,6 +154,26 @@ function App() {
       }
     };
     loadTheme();
+  }, []);
+
+  // Fetch dashboard data
+  useEffect(() => {
+    const loadDashboard = async () => {
+      setIsDashboardLoading(true);
+      try {
+        const response = await browser.runtime.sendMessage({
+          type: 'GET_DASHBOARD_DATA',
+        });
+        if (response?.success) {
+          setDashboardData(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      } finally {
+        setIsDashboardLoading(false);
+      }
+    };
+    loadDashboard();
   }, []);
 
   // Toggle theme
@@ -209,30 +233,7 @@ function App() {
 
   // Initialize slash commands
   useEffect(() => {
-    // Register POTD command
-    slashCommandService.registerCommand({
-      id: 'potd',
-      aliases: ['potd', 'today', 'daily'],
-      description: "Open today's Problem of the Day",
-      execute: async () => {
-        setIsLoading(true);
-        try {
-          const response = await browser.runtime.sendMessage({
-            type: 'OPEN_DAILY_PROBLEM',
-          });
-
-          if (response?.success) {
-            setQuery('');
-          } else {
-            console.error('Failed to open daily problem:', response?.error);
-          }
-        } catch (error) {
-          console.error('Failed to execute POTD command:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      },
-    });
+    // Removed POTD command as it is now in the dashboard
 
 
 
@@ -584,12 +585,12 @@ function App() {
 
   return (
     <div className="w-full h-screen bg-[var(--background)] overflow-hidden font-[var(--font-sans)] flex flex-col">
-      <Header
-        syncStatus={syncStatus}
-        isLoading={isLoading}
-        onSync={handleSync}
-        isDarkMode={isDarkMode}
+      <Header 
+        isDarkMode={isDarkMode} 
         onToggleTheme={handleToggleTheme}
+        onSync={handleSync}
+        isLoading={isLoading || isDashboardLoading}
+        userStats={dashboardData?.userStats || null}
       />
 
       <SearchInput
@@ -600,18 +601,26 @@ function App() {
         onKeyDown={handleKeyDown}
       />
 
-      <ResultsList
-        displayItems={displayItems}
-        query={query}
-        isLoading={isLoading}
-        selectedIndex={selectedIndex}
-        onOpenProblem={openProblem}
-        slashCommandSuggestions={slashCommandSuggestions}
-        onSelectSlashCommand={handleSlashCommandSelect}
-        isShowingHistory={isShowingHistory}
-        isShowingSuggestions={isShowingSuggestions}
-        onToggleGroup={toggleGroup}
-      />
+      {(!query && !isShowingHistory && !isShowingSuggestions) ? (
+        <Dashboard
+          data={dashboardData}
+          isLoading={isDashboardLoading}
+          onOpenProblem={(slug, data) => openProblem({ slug, ...data } as any, true)}
+        />
+      ) : (
+        <ResultsList
+          displayItems={displayItems}
+          query={query}
+          isLoading={isLoading}
+          selectedIndex={selectedIndex}
+          onOpenProblem={openProblem}
+          slashCommandSuggestions={slashCommandSuggestions}
+          onSelectSlashCommand={handleSlashCommandSelect}
+          isShowingHistory={isShowingHistory}
+          isShowingSuggestions={isShowingSuggestions}
+          onToggleGroup={toggleGroup}
+        />
+      )}
 
       <Footer />
     </div>

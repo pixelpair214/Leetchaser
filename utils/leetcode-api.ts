@@ -30,6 +30,13 @@ export interface LeetCodeApiResponse {
 export interface FriendUser {
   username: string;
   avatarUrl?: string;
+  timestamp?: string;
+}
+
+export interface UserStats {
+  solvedToday: number;
+  solvedThisWeek: number;
+  streak: number;
 }
 
 class LeetCodeService {
@@ -331,6 +338,64 @@ class LeetCodeService {
     };
   }
 
+  async getUserStats(): Promise<UserStats | null> {
+    try {
+      const { username } = await this.getUserStatus();
+      if (!username) return null;
+
+      const query = `
+        query userProfileCalendar($username: String!) {
+          matchedUser(username: $username) {
+            submissionCalendar
+          }
+        }
+      `;
+      const res = await fetch(this.DAILY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables: { username } }),
+      });
+      const data = await res.json();
+      const calendarStr = data.data?.matchedUser?.submissionCalendar;
+      if (!calendarStr) return null;
+
+      const calendar: Record<string, number> = JSON.parse(calendarStr);
+      
+      // Calculate stats based on UTC
+      const now = new Date();
+      // LeetCode resets at 00:00 UTC. 
+      const todayStartUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).getTime() / 1000;
+      
+      const solvedToday = calendar[todayStartUTC.toString()] || 0;
+      
+      let solvedThisWeek = 0;
+      // This week (last 7 days including today)
+      for (let i = 0; i < 7; i++) {
+        const day = todayStartUTC - (i * 86400);
+        solvedThisWeek += calendar[day.toString()] || 0;
+      }
+      
+      // Streak calculation
+      let streak = 0;
+      let currentDay = todayStartUTC;
+      
+      // If user hasn't solved today, check if they solved yesterday to maintain streak
+      if (!calendar[currentDay.toString()]) {
+         currentDay -= 86400;
+      }
+      
+      while (calendar[currentDay.toString()]) {
+        streak++;
+        currentDay -= 86400;
+      }
+      
+      return { solvedToday, solvedThisWeek, streak };
+    } catch (e) {
+      console.error('Failed to get user stats:', e);
+      return null;
+    }
+  }
+
   /** Gets the signed-in user's followed users. Shared by getFriendSuggestions
    * and getFriendSolvedMap so we only write the userStatus/following queries once. */
   private async fetchFollowedUsers(): Promise<
@@ -450,6 +515,7 @@ class LeetCodeService {
               existing.push({
                 username: friend.userSlug,
                 avatarUrl: friend.userAvatar || this.DEFAULT_AVATAR,
+                timestamp: sub.timestamp,
               });
             }
             map.set(sub.titleSlug, existing);
@@ -512,6 +578,7 @@ class LeetCodeService {
                 existing.solvedByFriends.push({
                   username: friend.userSlug,
                   avatarUrl: friend.userAvatar || 'https://assets.leetcode.com/users/default_avatar.jpg',
+                  timestamp: sub.timestamp,
                 });
               }
             }
@@ -648,6 +715,56 @@ class LeetCodeService {
       return finalResults;
     } catch (error) {
       console.error('Error in getFriendSuggestions:', error);
+      return [];
+    }
+  }
+
+  async getFriendsActivity(): Promise<any[]> {
+    try {
+      const followedUsers = await this.fetchFollowedUsers();
+      const acQuery = `
+        query recentAcSubmissions($username: String!, $limit: Int!) {
+          recentAcSubmissionList(username: $username, limit: $limit) {
+            id
+            title
+            titleSlug
+            timestamp
+          }
+        }
+      `;
+      const allActivities: any[] = [];
+      await Promise.all(
+        followedUsers.slice(0, 5).map(async (friend) => {
+          try {
+            const acRes = await fetch(this.DAILY_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: acQuery,
+                variables: { username: friend.userSlug, limit: 10 },
+              }),
+            });
+            const acData = await acRes.json();
+            const submissions = acData.data?.recentAcSubmissionList || [];
+            
+            for (const sub of submissions) {
+              allActivities.push({
+                friendUsername: friend.userSlug,
+                friendAvatar: friend.userAvatar || this.DEFAULT_AVATAR,
+                title: sub.title,
+                slug: sub.titleSlug,
+                timestamp: sub.timestamp,
+              });
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch AC submissions for ${friend.userSlug}:`, e);
+          }
+        })
+      );
+      
+      return allActivities.sort((a, b) => parseInt(b.timestamp, 10) - parseInt(a.timestamp, 10));
+    } catch (e) {
+      console.error('Failed to get friends activity:', e);
       return [];
     }
   }
