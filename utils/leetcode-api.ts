@@ -30,6 +30,13 @@ export interface LeetCodeApiResponse {
 export interface FriendUser {
   username: string;
   avatarUrl?: string;
+  timestamp?: string;
+}
+
+export interface UserStats {
+  solvedToday: number;
+  solvedThisWeek: number;
+  streak: number;
 }
 
 class LeetCodeService {
@@ -331,6 +338,64 @@ class LeetCodeService {
     };
   }
 
+  async getUserStats(): Promise<UserStats | null> {
+    try {
+      const { username } = await this.getUserStatus();
+      if (!username) return null;
+
+      const query = `
+        query userProfileCalendar($username: String!) {
+          matchedUser(username: $username) {
+            submissionCalendar
+          }
+        }
+      `;
+      const res = await fetch(this.DAILY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables: { username } }),
+      });
+      const data = await res.json();
+      const calendarStr = data.data?.matchedUser?.submissionCalendar;
+      if (!calendarStr) return null;
+
+      const calendar: Record<string, number> = JSON.parse(calendarStr);
+      
+      // Calculate stats based on UTC
+      const now = new Date();
+      // LeetCode resets at 00:00 UTC. 
+      const todayStartUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).getTime() / 1000;
+      
+      const solvedToday = calendar[todayStartUTC.toString()] || 0;
+      
+      let solvedThisWeek = 0;
+      // This week (last 7 days including today)
+      for (let i = 0; i < 7; i++) {
+        const day = todayStartUTC - (i * 86400);
+        solvedThisWeek += calendar[day.toString()] || 0;
+      }
+      
+      // Streak calculation
+      let streak = 0;
+      let currentDay = todayStartUTC;
+      
+      // If user hasn't solved today, check if they solved yesterday to maintain streak
+      if (!calendar[currentDay.toString()]) {
+         currentDay -= 86400;
+      }
+      
+      while (calendar[currentDay.toString()]) {
+        streak++;
+        currentDay -= 86400;
+      }
+      
+      return { solvedToday, solvedThisWeek, streak };
+    } catch (e) {
+      console.error('Failed to get user stats:', e);
+      return null;
+    }
+  }
+
   /** Gets the signed-in user's followed users. Shared by getFriendSuggestions
    * and getFriendSolvedMap so we only write the userStatus/following queries once. */
   private async fetchFollowedUsers(): Promise<
@@ -450,6 +515,7 @@ class LeetCodeService {
               existing.push({
                 username: friend.userSlug,
                 avatarUrl: friend.userAvatar || this.DEFAULT_AVATAR,
+                timestamp: sub.timestamp,
               });
             }
             map.set(sub.titleSlug, existing);
@@ -484,40 +550,43 @@ class LeetCodeService {
         }
       `;
 
-      for (const friend of followedUsers.slice(0, 5)) {
-        try {
-          const acRes = await fetch(this.DAILY_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: acQuery,
-              variables: { username: friend.userSlug, limit: 5 },
-            }),
-          });
-          const acData = await acRes.json();
-          const submissions = acData.data?.recentAcSubmissionList || [];
+      await Promise.all(
+        followedUsers.slice(0, 5).map(async (friend) => {
+          try {
+            const acRes = await fetch(this.DAILY_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: acQuery,
+                variables: { username: friend.userSlug, limit: 5 },
+              }),
+            });
+            const acData = await acRes.json();
+            const submissions = acData.data?.recentAcSubmissionList || [];
 
-          for (const sub of submissions) {
-            if (!problemMap.has(sub.titleSlug)) {
-              problemMap.set(sub.titleSlug, {
-                title: sub.title,
-                slug: sub.titleSlug,
-                solvedByFriends: [],
-                isSimilar: false,
-              });
+            for (const sub of submissions) {
+              if (!problemMap.has(sub.titleSlug)) {
+                problemMap.set(sub.titleSlug, {
+                  title: sub.title,
+                  slug: sub.titleSlug,
+                  solvedByFriends: [],
+                  isSimilar: false,
+                });
+              }
+              const existing = problemMap.get(sub.titleSlug);
+              if (!existing.solvedByFriends.some((f: any) => f.username === friend.userSlug)) {
+                existing.solvedByFriends.push({
+                  username: friend.userSlug,
+                  avatarUrl: friend.userAvatar || 'https://assets.leetcode.com/users/default_avatar.jpg',
+                  timestamp: sub.timestamp,
+                });
+              }
             }
-            const existing = problemMap.get(sub.titleSlug);
-            if (!existing.solvedByFriends.some((f: any) => f.username === friend.userSlug)) {
-              existing.solvedByFriends.push({
-                username: friend.userSlug,
-                avatarUrl: friend.userAvatar || 'https://assets.leetcode.com/users/default_avatar.jpg',
-              });
-            }
+          } catch (e) {
+            console.warn(`Failed to fetch AC submissions for ${friend.userSlug}:`, e);
           }
-        } catch (e) {
-          console.warn(`Failed to fetch AC submissions for ${friend.userSlug}:`, e);
-        }
-      }
+        })
+      );
 
       // 4. Fetch details & similar questions via GraphQL
       const questionQuery = `
@@ -553,71 +622,149 @@ class LeetCodeService {
         }
       }
 
-      for (const slug of solvedSlugs.slice(0, 4)) {
-        try {
+      // Pick representative slugs to fetch similar questions for
+      // to ensure we get a mix across different friends
+      // We only want to seed recommendations using problems the user hasn't solved yet
+      const slugsToFetchSimilar = new Set<string>();
+      for (const friend of followedUsers.slice(0, 5)) {
+        let addedForFriend = 0;
+        for (const slug of solvedSlugs) {
           const existing = problemMap.get(slug);
-
-          const qRes = await fetch(this.DAILY_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: questionQuery,
-              variables: { titleSlug: slug },
-            }),
-          });
-          const qData = await qRes.json();
-          const q = qData.data?.question;
-
-          if (q) {
-            if (!existing.id) {
-              // Can be a string like "LCP 01" or "12"
-              existing.id = q.questionFrontendId || 0;
-            }
-            existing.difficulty = q.difficulty || existing.difficulty || 'Medium';
-            existing.isPaidOnly = q.isPaidOnly ?? existing.isPaidOnly ?? false;
-
-            if (q.similarQuestions) {
-              try {
-                const parsed = JSON.parse(q.similarQuestions);
-                for (const sim of parsed.slice(0, 2)) {
-                  if (!problemMap.has(sim.titleSlug) && !similarMap.has(sim.titleSlug)) {
-                    let simId: string | number = 0;
-                    const cachedSim = await leetcodeDB.getProblemBySlug(sim.titleSlug);
-                    if (cachedSim) simId = cachedSim.id;
-
-                    similarMap.set(sim.titleSlug, {
-                      id: simId,
-                      title: sim.title,
-                      slug: sim.titleSlug,
-                      difficulty: sim.difficulty || 'Medium',
-                      isPaidOnly: false,
-                      isSimilar: true,
-                      similarToTitle: q.title,
-                    });
-                  }
-                }
-              } catch (err) {
-                console.warn('Failed to parse similarQuestions JSON:', err);
-              }
-            }
+          if (existing.status !== 'ac' && existing.solvedByFriends.some((f: any) => f.username === friend.userSlug)) {
+            slugsToFetchSimilar.add(slug);
+            addedForFriend++;
+            if (addedForFriend >= 2) break; // max 2 similar-fetches per friend
           }
-        } catch (e) {
-          console.warn(`Failed to fetch question details for ${slug}:`, e);
         }
       }
+      
+      const slugsArrayToFetch = Array.from(slugsToFetchSimilar).slice(0, 5);
+
+      await Promise.all(
+        slugsArrayToFetch.map(async (slug) => {
+          try {
+            const existing = problemMap.get(slug);
+
+            const qRes = await fetch(this.DAILY_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: questionQuery,
+                variables: { titleSlug: slug },
+              }),
+            });
+            const qData = await qRes.json();
+            const q = qData.data?.question;
+
+            if (q) {
+              if (!existing.id) {
+                // Can be a string like "LCP 01" or "12"
+                existing.id = q.questionFrontendId || 0;
+              }
+              existing.difficulty = q.difficulty || existing.difficulty || 'Medium';
+              existing.isPaidOnly = q.isPaidOnly ?? existing.isPaidOnly ?? false;
+
+              if (q.similarQuestions) {
+                try {
+                  const parsed = JSON.parse(q.similarQuestions);
+                  for (const sim of parsed.slice(0, 2)) {
+                    if (!problemMap.has(sim.titleSlug) && !similarMap.has(sim.titleSlug)) {
+                      // Add a placeholder to prevent concurrent redundant fetches for the same similar question
+                      similarMap.set(sim.titleSlug, { isPlaceholder: true });
+
+                      let simId: string | number = 0;
+                      let simStatus: string | null = null;
+                      const cachedSim = await leetcodeDB.getProblemBySlug(sim.titleSlug);
+                      if (cachedSim) {
+                        simId = cachedSim.id;
+                        simStatus = cachedSim.status ?? null;
+                      }
+
+                      similarMap.set(sim.titleSlug, {
+                        id: simId,
+                        title: sim.title,
+                        slug: sim.titleSlug,
+                        difficulty: sim.difficulty || 'Medium',
+                        status: simStatus,
+                        isPaidOnly: false,
+                        isSimilar: true,
+                        similarToTitle: q.title,
+                      });
+                    }
+                  }
+                } catch (err) {
+                  console.warn('Failed to parse similarQuestions JSON:', err);
+                }
+              }
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch question details for ${slug}:`, e);
+          }
+        })
+      );
 
       let fallbackId = 999000;
-      const finalResults = [...Array.from(problemMap.values()), ...Array.from(similarMap.values())].map(
-        item => ({
+      const finalResults = [...Array.from(problemMap.values()), ...Array.from(similarMap.values())]
+        .map(item => ({
           ...item,
           id: item.id || ++fallbackId,
           difficulty: item.difficulty || 'Medium',
-        })
-      );
+        }))
+        .filter(item => item.status !== 'ac' && !item.isPlaceholder);
 
       return finalResults;
     } catch (error) {
       console.error('Error in getFriendSuggestions:', error);
+      return [];
+    }
+  }
+
+  async getFriendsActivity(): Promise<any[]> {
+    try {
+      const followedUsers = await this.fetchFollowedUsers();
+      const acQuery = `
+        query recentAcSubmissions($username: String!, $limit: Int!) {
+          recentAcSubmissionList(username: $username, limit: $limit) {
+            id
+            title
+            titleSlug
+            timestamp
+          }
+        }
+      `;
+      const allActivities: any[] = [];
+      await Promise.all(
+        followedUsers.slice(0, 5).map(async (friend) => {
+          try {
+            const acRes = await fetch(this.DAILY_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: acQuery,
+                variables: { username: friend.userSlug, limit: 10 },
+              }),
+            });
+            const acData = await acRes.json();
+            const submissions = acData.data?.recentAcSubmissionList || [];
+            
+            for (const sub of submissions) {
+              allActivities.push({
+                friendUsername: friend.userSlug,
+                friendAvatar: friend.userAvatar || this.DEFAULT_AVATAR,
+                title: sub.title,
+                slug: sub.titleSlug,
+                timestamp: sub.timestamp,
+              });
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch AC submissions for ${friend.userSlug}:`, e);
+          }
+        })
+      );
+      
+      return allActivities.sort((a, b) => parseInt(b.timestamp, 10) - parseInt(a.timestamp, 10));
+    } catch (e) {
+      console.error('Failed to get friends activity:', e);
       return [];
     }
   }

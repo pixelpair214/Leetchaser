@@ -175,6 +175,27 @@ export default defineBackground(() => {
             }
             break;
 
+          case 'GET_DASHBOARD_DATA':
+            try {
+              const [dailyProblem, friendSuggestions, userStats] = await Promise.all([
+                leetcodeService.getDailyProblem(),
+                leetcodeService.getFriendsActivity(),
+                leetcodeService.getUserStats(),
+              ]);
+              response = { 
+                success: true, 
+                data: {
+                  dailyProblem,
+                  friendSuggestions,
+                  userStats,
+                }
+              };
+            } catch (error) {
+              console.error('Failed to get dashboard data:', error);
+              response = { success: false, error: 'Failed to get dashboard data' };
+            }
+            break;
+
           case 'GET_HISTORY':
             try {
               const history = await getHistory();

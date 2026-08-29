@@ -83,7 +83,7 @@ const ProblemItem = forwardRef<HTMLDivElement, ProblemItemProps>(
             {problem.solvedByFriends && problem.solvedByFriends.length > 0 && (
               <div
                 className="flex items-center -space-x-1.5 flex-shrink-0"
-                title={`Solved by: ${problem.solvedByFriends.map(f => f.username).join(', ')}`}
+                title={`Recently solved by: ${problem.solvedByFriends.map(f => f.username).join(', ')}`}
               >
                 {problem.solvedByFriends.map((friend, idx) => (
                   <img
@@ -122,15 +122,10 @@ const ProblemItem = forwardRef<HTMLDivElement, ProblemItemProps>(
                 </div>
               )}
               {!problem.similarToTitle &&
-                (problem.status === 'ac' || (problem.solvedByFriends && problem.solvedByFriends.length > 0)) && (
+                (problem.solvedByFriends && problem.solvedByFriends.length > 0) && (
                   <div className="text-[10px] text-[var(--muted-foreground)] truncate">
-                    Solved by{' '}
-                    {[
-                      problem.status === 'ac' ? 'You' : null,
-                      ...(problem.solvedByFriends?.map(f => f.username) || []),
-                    ]
-                      .filter(Boolean)
-                      .join(', ')}
+                    Recently solved by{' '}
+                    {problem.solvedByFriends.map(f => f.username).join(', ')}
                   </div>
                 )}
             </div>
