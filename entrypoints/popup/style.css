@@ -1,0 +1,152 @@
+/* Import JetBrains Mono font */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
+
+@import 'tailwindcss';
+
+body {
+  letter-spacing: var(--tracking-normal);
+  width: 480px;
+  min-height: 600px;
+  max-height: 800px;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+:root {
+  /* Light theme (default) */
+  --background: oklch(0.9761 0.0041 91.4461);
+  --foreground: oklch(22.645% 0.00003 271.152);
+  --card: oklch(0.991 0.0041 91.4454);
+  --primary: oklch(0.285 0 0);
+  --muted: oklch(0.9581 0 0);
+  --muted-foreground: oklch(0.5517 0.0138 285.9385);
+  --accent: oklch(0.9581 0 0);
+  --destructive: oklch(0.6368 0.2078 25.3313);
+  --border: oklch(0.937 0 0);
+  --ring: oklch(0.7118 0.0129 286.0665);
+  --chart-2: oklch(0.6056 0.2189 292.7172);
+  --chart-3: oklch(0.7227 0.192 149.5793);
+  --chart-4: oklch(0.7952 0.1617 86.0468);
+  --font-sans: JetBrains Mono, ui-monospace, monospace;
+  --radius: 0rem;
+  --tracking-normal: -0.05em;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+
+  /* Solve status colors */
+  --status-solved: oklch(0.60 0.17 145);    /* green  */
+  --status-attempted: oklch(0.72 0.15 65);  /* amber  */
+}
+
+:root[data-theme='dark'] {
+  /* Dark theme */
+  --background: oklch(0.15 0.005 264);
+  --foreground: oklch(0.98 0.005 264);
+  --card: oklch(0.18 0.005 264);
+  --primary: oklch(0.98 0 0);
+  --muted: oklch(0.25 0.005 264);
+  --muted-foreground: oklch(0.65 0.015 264);
+  --accent: oklch(0.25 0.005 264);
+  --destructive: oklch(0.6368 0.2078 25.3313);
+  --border: oklch(0.28 0.005 264);
+  --ring: oklch(0.7118 0.0129 286.0665);
+  --chart-2: oklch(0.6056 0.2189 292.7172);
+  --chart-3: oklch(0.7227 0.192 149.5793);
+  --chart-4: oklch(0.7952 0.1617 86.0468);
+
+  /* Solve status colors */
+  --status-solved: oklch(0.72 0.17 145);    /* brighter green for dark bg */
+  --status-attempted: oklch(0.80 0.15 70);  /* brighter amber for dark bg */
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-md);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Animations */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Utility classes */
+.minimal-button {
+  transition: all 0.15s ease;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+}
+
+.minimal-button:hover {
+  transform: translateY(-1px);
+}
+
+.minimal-button:active {
+  transform: translateY(0);
+}
+
+/* Difficulty dots */
+.difficulty-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-lg);
+  display: inline-block;
+}
+
+.difficulty-easy {
+  background-color: var(--chart-3);
+}
+
+.difficulty-medium {
+  background-color: var(--chart-4);
+}
+
+.difficulty-hard {
+  background-color: var(--destructive);
+}

@@ -1,0 +1,55 @@
+{
+  "name": "leetjump",
+  "description": "A powerful browser extension for quick LeetCode problem navigation with keyboard shortcuts",
+  "private": true,
+  "version": "1.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:edge": "wxt -b edge",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "compile": "tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.1.13",
+    "cmdk": "^1.0.4",
+    "fuse.js": "^7.0.0",
+    "idb": "^8.0.0",
+    "lucide-react": "^0.544.0",
+    "postcss": "^8.5.6",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwindcss": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@wxt-dev/module-react": "^1.1.3",
+    "typescript": "^5.9.2",
+    "wxt": "^0.20.6",
+    "vitest": "^1.6.0",
+    "@types/chrome": "^0.0.268",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0"
+  },
+  "keywords": [
+    "leetcode",
+    "browser-extension",
+    "keyboard-shortcuts",
+    "productivity",
+    "web-extension",
+    "react",
+    "typescript"
+  ],
+  "author": "[Your Name]",
+  "license": "MIT",
+  "repository": {
+    "type": "git"
+  }
+}
