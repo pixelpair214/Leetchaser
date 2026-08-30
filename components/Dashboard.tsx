@@ -63,9 +63,9 @@ export default function Dashboard({ data, isLoading, onOpenProblem, onEnterChase
         <h2 className="text-[10px] font-bold text-[var(--muted-foreground)] tracking-wider mb-2 uppercase">Today's Chase</h2>
         <div 
           onClick={() => dailyProblem && onOpenProblem(dailyProblem.slug, dailyProblem)}
-          className="relative bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 cursor-pointer hover:bg-[var(--muted)] transition-colors group"
+          className="relative bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 cursor-pointer hover:bg-[var(--muted)] transition-colors group"
         >
-          <div className="flex justify-between items-start mb-3">
+          <div className="flex justify-between items-start mb-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-[#FF8A00]">DAILY FOCUS</span>
               {dailyProblem && (
@@ -76,7 +76,7 @@ export default function Dashboard({ data, isLoading, onOpenProblem, onEnterChase
             </div>
           </div>
           
-          <div className="text-xl font-bold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
+          <div className="text-lg font-bold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
             {dailyProblem ? (
                <div className="flex items-center gap-2">
                   <span className="text-[#FF8A00] opacity-80">#{dailyProblem.id}</span>
@@ -124,16 +124,16 @@ export default function Dashboard({ data, isLoading, onOpenProblem, onEnterChase
         <section>
           <div
             onClick={onEnterChaseMode}
-            className="bg-gradient-to-r from-[#FF8A00]/15 via-[var(--card)] to-[var(--card)] border border-[#FF8A00]/40 rounded-xl p-3.5 cursor-pointer hover:border-[#FF8A00] transition-all group shadow-sm flex items-center justify-between"
+            className="bg-[var(--card)] border border-[var(--border)] hover:border-[#FF8A00]/50 rounded-xl p-3.5 cursor-pointer transition-all group shadow-sm flex items-center justify-between"
           >
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#FF8A00]/20 flex items-center justify-center text-[#FF8A00] group-hover:scale-105 transition-transform">
-                <Target className="w-4 h-4 animate-pulse" />
+              <div className="w-8 h-8 rounded-lg bg-[var(--muted)] flex items-center justify-center text-[var(--muted-foreground)] group-hover:scale-105 transition-transform">
+                <Target className="w-4 h-4" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-xs">
-                  <span className="text-[#FF8A00]">CHASE MODE</span>
-                  <span className="text-[9px] font-mono px-1 py-0.2 bg-[#FF8A00]/20 text-[#FF8A00] rounded font-bold">@chase</span>
+                  <span className="text-[var(--foreground)]">Chase Mode</span>
+                  <span className="text-[9px] font-mono px-1 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded font-bold">@chase</span>
                 </div>
                 <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
                   Live 1v1 telemetry & race up to 3 LeetCode members
@@ -141,7 +141,7 @@ export default function Dashboard({ data, isLoading, onOpenProblem, onEnterChase
               </div>
             </div>
 
-            <ChevronRight className="w-4 h-4 text-[#FF8A00] group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-4 h-4 text-[var(--muted-foreground)] group-hover:text-[#FF8A00] group-hover:translate-x-0.5 transition-all" />
           </div>
         </section>
       )}
