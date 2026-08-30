@@ -903,10 +903,10 @@ class LeetCodeService {
         }
       `;
 
-      const response = await fetch(this.DAILY_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables: { username } }),
+      const url = `${this.DAILY_ENDPOINT}?query=${encodeURIComponent(query)}&variables=${encodeURIComponent(JSON.stringify({ username }))}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
       });
 
       if (!response.ok) {
@@ -1109,10 +1109,10 @@ class LeetCodeService {
           }
         }
       `;
-      const res = await fetch(this.DAILY_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables: { username: username.trim() } }),
+      const url = `${this.DAILY_ENDPOINT}?query=${encodeURIComponent(query)}&variables=${encodeURIComponent(JSON.stringify({ username: username.trim() }))}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
       });
       const data = await res.json();
       return !!data.data?.matchedUser?.username;

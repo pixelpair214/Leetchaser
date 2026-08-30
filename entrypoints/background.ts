@@ -8,11 +8,6 @@ export default defineBackground(() => {
 
     if (details.reason === 'install') {
       console.log('First time installation - syncing LeetCode problems...');
-      browser.tabs.create({
-        url: `https://leetjump.lirena.in/thanks?utm_source=extension&utm_medium=install&browser=${
-          import.meta.env.BROWSER
-        }`,
-      });
       try {
         await leetcodeService.syncProblems((current, total) => {
           console.log(`Sync progress: ${current}/${total} problems`);

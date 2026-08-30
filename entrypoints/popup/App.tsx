@@ -202,7 +202,9 @@ function App() {
       if (response?.success) {
         const suggestionsData = response.data || [];
 
-        const formattedResults: SearchResult[] = suggestionsData.map((entry: any) => ({
+        const formattedResults: SearchResult[] = suggestionsData
+          .filter((entry: any) => entry.status !== 'ac')
+          .map((entry: any) => ({
           id: entry.id,
           title: entry.title,
           slug: entry.slug,
@@ -378,7 +380,7 @@ function App() {
     });
 
     // Register rate command
-    slashCommandService.registerCommand({
+    /* slashCommandService.registerCommand({
       id: 'review',
       aliases: ['rate', 'review', 'store'],
       description: 'Rate this extension on the store',
@@ -394,7 +396,7 @@ function App() {
           console.error('Failed to execute RATE command:', error);
         }
       },
-    });
+    }); */
   }, [handleToggleTheme, fetchSuggestions]);
 
   // Focus input on mount
