@@ -118,7 +118,7 @@ Your data stays yours.
 
 ## 🤝 Contributing
 
-We welcome contributions of all kinds! Check out our [Contributing Guide](https://github.com/pixelpair214/Leetchaser/blob/master/CONTRIBUTING.md) to get started.
+We welcome contributions of all kinds!
 
 1. **Fork** the repository.
 2. **Branch**: `git checkout -b feature/amazing-feature`
@@ -131,7 +131,6 @@ We welcome contributions of all kinds! Check out our [Contributing Guide](https:
 
 - 🐛 **Found a bug?** [Open an Issue](https://github.com/pixelpair214/Leetchaser/issues)
 - ✨ **Have an idea?** [Request a Feature](https://github.com/pixelpair214/Leetchaser/issues)
-- 🗣️ **Want to chat?** [Join Discussions](https://github.com/pixelpair214/Leetchaser/discussions)
 
 
 ## 📄 License
