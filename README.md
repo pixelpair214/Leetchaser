@@ -133,6 +133,10 @@ We welcome contributions of all kinds! Check out our [Contributing Guide](https:
 - ✨ **Have an idea?** [Request a Feature](https://github.com/pixelpair214/Leetchaser/issues)
 - 🗣️ **Want to chat?** [Join Discussions](https://github.com/pixelpair214/Leetchaser/discussions)
 
+## 🙏 Acknowledgements
+
+Inspired by and built upon **LeetJump**, originally created by [@lirena00](https://github.com/lirena00).
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/pixelpair214/Leetchaser/blob/master/LICENSE) file for details.
