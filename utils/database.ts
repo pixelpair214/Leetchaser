@@ -30,7 +30,7 @@ interface LeetCodeDB extends DBSchema {
 
 class LeetCodeDatabase {
   private db: IDBPDatabase<LeetCodeDB> | null = null;
-  private readonly DB_NAME = 'leetjump';
+  private readonly DB_NAME = 'leetchaser';
   private readonly DB_VERSION = 1;
 
   async init(): Promise<void> {

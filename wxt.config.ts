@@ -4,8 +4,8 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
-    name: 'LeetJump - Leetcode quick search extension',
-    description: 'Quick LeetCode problem search with Alt+L - minimal, fast, and clean interface',
+    name: 'LeetChaser - Quick navigation and competitive LeetCoding',
+    description: 'Quick navigation, friend-tracking, and competitive LeetCoding right from your keyboard',
     version: '1.1.0',
     permissions: ['alarms', 'storage'],
     host_permissions: ['https://leetcode.com/*', 'https://leetcode.cn/*'],

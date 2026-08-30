@@ -21,9 +21,7 @@ export default defineBackground(() => {
       const currentVersion = browser.runtime.getManifest().version;
       if (previousVersion !== currentVersion) {
         browser.tabs.create({
-          url: `https://leetjump.lirena.in/release-notes/?utm_source=extension&utm_medium=update&browser=${
-            import.meta.env.BROWSER
-          }#v${currentVersion}`,
+          url: `https://github.com/pixelpair214/Leetchaser/releases/tag/v${currentVersion}`,
         });
       }
     }
@@ -216,8 +214,8 @@ export default defineBackground(() => {
               const browserType = import.meta.env.BROWSER;
               const storeUrl =
                 browserType === 'firefox'
-                  ? 'https://addons.mozilla.org/en-US/firefox/addon/leetjump/'
-                  : 'https://chromewebstore.google.com/detail/leetjump-leetcode-quick-s/mapaacjngblliffleponocgiopaclfld';
+                  ? 'https://github.com/pixelpair214/Leetchaser'
+                  : 'https://github.com/pixelpair214/Leetchaser';
 
               await browser.tabs.create({
                 url: storeUrl,
