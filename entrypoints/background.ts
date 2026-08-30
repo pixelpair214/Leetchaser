@@ -8,6 +8,8 @@ export default defineBackground(() => {
 
     if (details.reason === 'install') {
       console.log('First time installation - syncing LeetCode problems...');
+      // Open thank you page
+      browser.tabs.create({ url: 'https://leetchaser.netlify.app/thanku/' });
       try {
         await leetcodeService.syncProblems((current, total) => {
           console.log(`Sync progress: ${current}/${total} problems`);
