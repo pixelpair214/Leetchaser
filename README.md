@@ -76,10 +76,10 @@ git clone https://github.com/pixelpair214/Leetchaser.git
 cd Leetchaser
 
 # 2. Install dependencies
-bun install
+npm install
 
 # 3. Start development mode
-bun dev
+npm dev
 ```
 
 *The extension uses WXT and will auto-reload as you make changes!*
@@ -87,8 +87,8 @@ bun dev
 ### Build Commands
 
 ```bash
-bun dev       # Start development mode with hot-reload
-bun run build # Build for production
+npm dev       # Start development mode with hot-reload
+npm run build # Build for production
 ```
 
 ---
