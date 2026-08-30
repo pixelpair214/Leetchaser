@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, RotateCw, Zap } from 'lucide-react';
+import { Search, RotateCw, Zap, Target } from 'lucide-react';
 
 interface SearchInputProps {
   query: string;
@@ -16,13 +16,17 @@ export default function SearchInput({
   onQueryChange,
   onKeyDown,
 }: SearchInputProps) {
+  const isAtCommand = query.startsWith('@');
   const isSlashCommand = query.startsWith('/');
+  const isCommand = isAtCommand || isSlashCommand;
 
   return (
     <div className="px-4 py-3 flex-shrink-0">
       <div className="relative">
         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-          {isSlashCommand ? (
+          {isAtCommand ? (
+            <Target className="w-4 h-4 text-[#FF8A00] animate-pulse" />
+          ) : isSlashCommand ? (
             <Zap className="w-4 h-4 text-[var(--chart-4)]" />
           ) : (
             <Search className="w-4 h-4 text-[var(--muted-foreground)]" />
@@ -34,10 +38,18 @@ export default function SearchInput({
           value={query}
           onChange={e => onQueryChange(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={isSlashCommand ? 'Type command name...' : 'Search problems...'}
-          className={`w-full pl-10 pr-12 py-3 text-sm border border-[var(--border)] rounded-xl focus:outline-none focus:ring-1 focus:ring-[var(--ring)] transition-all placeholder:text-[var(--muted-foreground)] ${
-            isSlashCommand
-              ? 'bg-[var(--chart-4)]/10 text-[var(--chart-4)] border-[var(--chart-4)]/30'
+          placeholder={
+            isAtCommand
+              ? 'Type @chase to enter chase mode...'
+              : isSlashCommand
+              ? 'Type /random, /suggestion, /help...'
+              : 'Search problems, /commands, or @chase...'
+          }
+          className={`w-full pl-10 pr-16 py-3 text-sm border border-[var(--border)] rounded-xl focus:outline-none focus:ring-1 focus:ring-[var(--ring)] transition-all placeholder:text-[var(--muted-foreground)] ${
+            isAtCommand
+              ? 'bg-[#FF8A00]/10 text-[#FF8A00] border-[#FF8A00]/30 font-medium'
+              : isSlashCommand
+              ? 'bg-[var(--chart-4)]/10 text-[var(--chart-4)] border-[var(--chart-4)]/30 font-medium'
               : 'bg-[var(--card)] text-[var(--foreground)] focus:bg-[var(--background)]'
           }`}
         />
@@ -45,9 +57,11 @@ export default function SearchInput({
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
             <RotateCw className="w-4 h-4 text-[var(--muted-foreground)] animate-spin" />
           </div>
-        ) : !isSlashCommand ? (
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded bg-[var(--muted)] border border-[var(--border)] text-[10px] text-[var(--muted-foreground)] font-mono">
-            /
+        ) : !isCommand ? (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+            <div className="flex items-center justify-center px-1.5 h-5 rounded bg-[var(--muted)] border border-[var(--border)] text-[10px] text-[#FF8A00] font-mono font-bold">
+              @chase
+            </div>
           </div>
         ) : null}
       </div>

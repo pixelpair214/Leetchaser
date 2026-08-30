@@ -2,13 +2,27 @@ interface EmptyStateProps {
   hasQuery: boolean;
   isLoading: boolean;
   isShowingHistory?: boolean;
+  isShowingSuggestions?: boolean;
 }
 
 export default function EmptyState({
   hasQuery,
   isLoading,
   isShowingHistory = false,
+  isShowingSuggestions = false,
 }: EmptyStateProps) {
+  // Suggestions empty state
+  if (isShowingSuggestions) {
+    return (
+      <div className="px-4 py-12 text-center">
+        <div className="text-sm font-medium text-[var(--foreground)] mb-1">No friend suggestions found</div>
+        <div className="text-xs text-[var(--muted-foreground)]">
+          Follow LeetCode friends or enter @chase to track your targets
+        </div>
+      </div>
+    );
+  }
+
   // History empty state
   if (isShowingHistory) {
     return (

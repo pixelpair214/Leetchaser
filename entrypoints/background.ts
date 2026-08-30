@@ -8,11 +8,6 @@ export default defineBackground(() => {
 
     if (details.reason === 'install') {
       console.log('First time installation - syncing LeetCode problems...');
-      browser.tabs.create({
-        url: `https://leetjump.lirena.in/thanks?utm_source=extension&utm_medium=install&browser=${
-          import.meta.env.BROWSER
-        }`,
-      });
       try {
         await leetcodeService.syncProblems((current, total) => {
           console.log(`Sync progress: ${current}/${total} problems`);
@@ -232,6 +227,27 @@ export default defineBackground(() => {
             } catch (error) {
               console.error('Failed to open extension store:', error);
               response = { success: false, error: 'Failed to open extension store' };
+            }
+            break;
+
+          case 'GET_CHASE_DATA':
+            try {
+              const targets = message.targets || [];
+              const chaseData = await leetcodeService.fetchChaseData(targets);
+              response = { success: true, data: chaseData };
+            } catch (error) {
+              console.error('Failed to get chase data:', error);
+              response = { success: false, error: 'Failed to get chase data' };
+            }
+            break;
+
+          case 'VALIDATE_LEETCODE_USERNAME':
+            try {
+              const isValid = await leetcodeService.validateUsername(message.username);
+              response = { success: true, isValid };
+            } catch (error) {
+              console.error('Failed to validate username:', error);
+              response = { success: false, error: 'Failed to validate username' };
             }
             break;
 
