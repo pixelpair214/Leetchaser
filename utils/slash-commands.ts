@@ -17,7 +17,7 @@ class SlashCommandService {
 
   registerCommand(command: SlashCommand) {
     if (!command.prefix) {
-      command.prefix = command.id === 'chase' ? '@' : '/';
+      command.prefix = (command.id === 'chase' || command.id === 'stuck') ? '@' : '/';
     }
     this.commands.set(command.id, command);
   }
@@ -36,9 +36,9 @@ class SlashCommandService {
     const typedPrefix = input.charAt(0);
     const query = input.slice(1).toLowerCase();
 
-    // If user types '@': ONLY show '@' commands (e.g. @chase)
+    // If user types '@': show '@' commands (e.g. @chase, @stuck)
     if (typedPrefix === '@') {
-      const atCommands = this.getCommands().filter(c => c.prefix === '@' || c.id === 'chase');
+      const atCommands = this.getCommands().filter(c => c.prefix === '@' || c.id === 'chase' || c.id === 'stuck');
 
       if (query === '' || query === 'help' || query === 'commands') {
         return atCommands.map(cmd => ({
@@ -61,7 +61,7 @@ class SlashCommandService {
     }
 
     // If user types '/': show standard slash commands
-    const slashCommands = this.getCommands().filter(c => c.prefix !== '@' && c.id !== 'chase');
+    const slashCommands = this.getCommands().filter(c => c.prefix !== '@' && c.id !== 'chase' && c.id !== 'stuck');
 
     if (query === 'help' || query === 'commands' || query === '') {
       return slashCommands

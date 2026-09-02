@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, ArrowRight, Target } from 'lucide-react';
+import { Zap, ArrowRight, Target, Sparkles } from 'lucide-react';
 import { SlashCommandSuggestion } from '@/utils/slash-commands';
 
 interface SlashCommandSuggestionsProps {
@@ -26,22 +26,27 @@ export default function SlashCommandSuggestions({
     );
   }
 
-  const isChaseSuggestion = suggestions.some(s => s.command.id === 'chase' || s.prefix === '@');
+  const isChaseSuggestion = suggestions.some(s => s.command.id === 'chase' || s.prefix === '@') && !suggestions.some(s => s.command.id === 'stuck');
+  const isStuckSuggestion = suggestions.some(s => s.command.id === 'stuck');
+  const isAtSuggestion = suggestions.some(s => s.prefix === '@');
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="px-4 py-3 border-b border-[var(--border)]">
-        <div className={`flex items-center gap-2 text-xs ${isChaseSuggestion ? 'text-[#FF8A00]' : 'text-[var(--chart-4)]'}`}>
-          {isChaseSuggestion ? <Target className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
+        <div className={`flex items-center gap-2 text-xs ${
+          isStuckSuggestion ? 'text-purple-400' : isChaseSuggestion ? 'text-[#FF8A00]' : 'text-[var(--chart-4)]'
+        }`}>
+          {isStuckSuggestion ? <Sparkles className="w-3.5 h-3.5" /> : isChaseSuggestion ? <Target className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
           <span className="font-semibold">{isHelpMode ? 'Available Commands' : 'Commands & Shortcuts'}</span>
         </div>
       </div>
 
       <div className="space-y-0">
         {suggestions.map((suggestion, index) => {
-          const prefix = suggestion.prefix || (suggestion.command.id === 'chase' ? '@' : '/');
-          const isChase = suggestion.command.id === 'chase' || prefix === '@';
-          const accentColor = isChase ? '#FF8A00' : 'var(--chart-4)';
+          const prefix = suggestion.prefix || (suggestion.command.id === 'chase' ? '@' : suggestion.command.id === 'stuck' ? '@' : '/');
+          const isChase = suggestion.command.id === 'chase' || (prefix === '@' && suggestion.command.id !== 'stuck');
+          const isStuck = suggestion.command.id === 'stuck';
+          const accentColor = isStuck ? 'var(--purple-400, #a855f7)' : isChase ? '#FF8A00' : 'var(--chart-4)';
 
           return (
             <div
@@ -53,7 +58,9 @@ export default function SlashCommandSuggestions({
               }}
               className={`group px-4 py-3 cursor-pointer transition-all duration-150 border-l-2 ${
                 index === selectedIndex
-                  ? isChase 
+                  ? isStuck
+                    ? 'bg-purple-500/10 border-l-purple-500 border-l-4'
+                    : isChase 
                     ? 'bg-[#FF8A00]/10 border-l-[#FF8A00] border-l-4'
                     : 'bg-[var(--chart-4)]/10 border-l-[var(--chart-4)] border-l-4'
                   : 'hover:bg-[var(--accent)] border-l-transparent'
