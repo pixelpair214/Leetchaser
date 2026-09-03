@@ -105,6 +105,23 @@ export default defineBackground(() => {
             }
             response = { success: true };
             break;
+
+          case 'OPEN_CHATGPT_URL':
+            await browser.tabs.create({
+              url: message.url,
+              active: true,
+            });
+            if (message.problemData && message.problemData.slug) {
+              await addToHistory({
+                slug: message.problemData.slug,
+                title: message.problemData.title,
+                difficulty: message.problemData.difficulty || 'Medium',
+                id: message.problemData.id,
+              });
+            }
+            response = { success: true };
+            break;
+
           case 'OPEN_RANDOM_PROBLEM':
             try {
               const randomProblem = await leetcodeService.getRandomProblem();

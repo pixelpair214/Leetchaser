@@ -8,6 +8,7 @@ import ResultsList from '@/components/ResultsList';
 import Footer from '@/components/Footer';
 import Dashboard, { DashboardData } from '@/components/Dashboard';
 import ChaseMode from '@/components/ChaseMode';
+import StuckMode from '@/components/StuckMode';
 
 export interface FriendUser {
   username: string;
@@ -94,6 +95,7 @@ function App() {
   const [isShowingHistory, setIsShowingHistory] = useState(false);
   const [isShowingSuggestions, setIsShowingSuggestions] = useState(false);
   const [isShowingChaseMode, setIsShowingChaseMode] = useState(false);
+  const [isShowingStuckMode, setIsShowingStuckMode] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
@@ -254,6 +256,23 @@ function App() {
       prefix: '@',
       execute: async () => {
         setIsShowingChaseMode(true);
+        setIsShowingHistory(false);
+        setIsShowingSuggestions(false);
+        setIsShowingStuckMode(false);
+        setQuery('');
+        setSlashCommandSuggestions([]);
+      },
+    });
+
+    // Register @stuck command
+    slashCommandService.registerCommand({
+      id: 'stuck',
+      aliases: ['stuck', 'hint', 'ask'],
+      description: 'AI-guided problem help via ChatGPT — understand the question or get approach hints',
+      prefix: '@',
+      execute: async () => {
+        setIsShowingStuckMode(true);
+        setIsShowingChaseMode(false);
         setIsShowingHistory(false);
         setIsShowingSuggestions(false);
         setQuery('');
@@ -491,14 +510,14 @@ function App() {
 
   // Debounced search effect
   useEffect(() => {
-    if (!query.startsWith('/') && !query.startsWith('@') && !isShowingHistory && !isShowingSuggestions && !isShowingChaseMode) {
+    if (!query.startsWith('/') && !query.startsWith('@') && !isShowingHistory && !isShowingSuggestions && !isShowingChaseMode && !isShowingStuckMode) {
       const timer = setTimeout(() => {
         performSearch(query);
       }, 150);
 
       return () => clearTimeout(timer);
     }
-  }, [query, performSearch, isShowingHistory, isShowingSuggestions, isShowingChaseMode]);
+  }, [query, performSearch, isShowingHistory, isShowingSuggestions, isShowingChaseMode, isShowingStuckMode]);
 
   // Handle command selection
   const handleSlashCommandSelect = useCallback(async (command: string) => {
@@ -506,6 +525,17 @@ function App() {
     
     if (cleanCmd === 'chase' || cleanCmd === 'target' || cleanCmd === 'race') {
       setIsShowingChaseMode(true);
+      setIsShowingHistory(false);
+      setIsShowingSuggestions(false);
+      setIsShowingStuckMode(false);
+      setQuery('');
+      setSlashCommandSuggestions([]);
+      return;
+    }
+
+    if (cleanCmd === 'stuck' || cleanCmd === 'hint' || cleanCmd === 'ask') {
+      setIsShowingStuckMode(true);
+      setIsShowingChaseMode(false);
       setIsShowingHistory(false);
       setIsShowingSuggestions(false);
       setQuery('');
@@ -548,8 +578,24 @@ function App() {
             cleanQuery === '@target' ||
             cleanQuery === '@race';
 
+          const isStuckTrigger =
+            cleanQuery === '@stuck' ||
+            cleanQuery === '@hint' ||
+            cleanQuery === '@ask';
+
           if (isChaseTrigger) {
             setIsShowingChaseMode(true);
+            setIsShowingHistory(false);
+            setIsShowingSuggestions(false);
+            setIsShowingStuckMode(false);
+            setQuery('');
+            setSlashCommandSuggestions([]);
+            return;
+          }
+
+          if (isStuckTrigger) {
+            setIsShowingStuckMode(true);
+            setIsShowingChaseMode(false);
             setIsShowingHistory(false);
             setIsShowingSuggestions(false);
             setQuery('');
@@ -563,6 +609,17 @@ function App() {
 
               if (suggestion.command.id === 'chase') {
                 setIsShowingChaseMode(true);
+                setIsShowingHistory(false);
+                setIsShowingSuggestions(false);
+                setIsShowingStuckMode(false);
+                setQuery('');
+                setSlashCommandSuggestions([]);
+                return;
+              }
+
+              if (suggestion.command.id === 'stuck') {
+                setIsShowingStuckMode(true);
+                setIsShowingChaseMode(false);
                 setIsShowingHistory(false);
                 setIsShowingSuggestions(false);
                 setQuery('');
@@ -599,6 +656,7 @@ function App() {
           setIsShowingHistory(false);
           setIsShowingSuggestions(false);
           setIsShowingChaseMode(false);
+          setIsShowingStuckMode(false);
           break;
       }
     },
@@ -666,7 +724,7 @@ function App() {
         userStats={dashboardData?.userStats || null}
       />
 
-      {!isShowingChaseMode && (
+      {!isShowingChaseMode && !isShowingStuckMode && (
         <SearchInput
           query={query}
           isLoading={isLoading}
@@ -680,6 +738,11 @@ function App() {
         <ChaseMode
           onClose={() => setIsShowingChaseMode(false)}
           onOpenProblem={(slug, data) => openProblem({ slug, ...data } as any, true)}
+        />
+      ) : isShowingStuckMode ? (
+        <StuckMode
+          onClose={() => setIsShowingStuckMode(false)}
+          dailyProblem={dashboardData?.dailyProblem || null}
         />
       ) : (!query && !isShowingHistory && !isShowingSuggestions) ? (
         <Dashboard
