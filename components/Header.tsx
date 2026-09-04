@@ -19,7 +19,7 @@ export default function Header({ isDarkMode, onToggleTheme, onSync, isLoading, u
             <span className="text-[#FF8A00]">Chaser</span>
           </span>
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)] mt-1">
-            1.1.0
+            1.1.1
           </span>
         </h1>
         

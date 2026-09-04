@@ -6,7 +6,7 @@ export default defineConfig({
   manifest: {
     name: 'LeetChaser - Quick navigation and competitive LeetCoding',
     description: 'Quick navigation, friend-tracking, and competitive LeetCoding right from your keyboard',
-    version: '1.1.0',
+    version: '1.1.1',
     permissions: ['alarms', 'storage'],
     host_permissions: ['https://leetcode.com/*', 'https://leetcode.cn/*'],
     commands: {
